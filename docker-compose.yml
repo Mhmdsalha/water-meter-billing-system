@@ -1,0 +1,11 @@
+services:
+  water-billing:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      NEXT_TELEMETRY_DISABLED: "1"

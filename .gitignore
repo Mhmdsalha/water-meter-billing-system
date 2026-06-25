@@ -1,0 +1,19 @@
+.next
+node_modules
+database.sqlite
+database.sqlite-*
+*.log
+.env
+.env.local
+
+# Local runtime artifacts
+tmp/
+backups/
+*.sqlite
+*.sqlite-*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

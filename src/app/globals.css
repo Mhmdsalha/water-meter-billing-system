@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 11 18 32;
+  --surface: 17 24 39;
+  --surface-strong: 23 32 51;
+  --border: 38 50 68;
+  --accent: 45 212 191;
+  --accent-dim: 20 184 166;
+  --success: 34 197 94;
+  --warning: 245 158 11;
+  --danger: 239 68 68;
+  --text-primary: 248 250 252;
+  --text-muted: 156 163 175;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  direction: rtl;
+  background: rgb(var(--bg));
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(45, 212, 191, 0.16), transparent 24rem),
+    radial-gradient(circle at 10% 24%, rgba(59, 130, 246, 0.09), transparent 18rem),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 48%, #111827 100%);
+  color: rgb(var(--text-primary));
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.28);
+  color: var(--text-primary);
+}
+
+input,
+textarea,
+select {
+  color-scheme: dark;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.number {
+  direction: ltr;
+  text-align: left;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.app-shell {
+  position: relative;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.app-shell::before {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.1), rgba(11, 18, 32, 0.55));
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
