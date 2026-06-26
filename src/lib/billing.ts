@@ -26,10 +26,6 @@ function fixed(value: number) {
   return parseFloat(value.toFixed(STORAGE_PRECISION));
 }
 
-function rawFraction(value: number) {
-  return fixed(value - Math.floor(value));
-}
-
 function naturalBill(rawAmount: number) {
   return Math.max(0, Math.ceil(rawAmount));
 }
@@ -85,7 +81,7 @@ export function calculateBilling(
 
   const targetTotal = Number.isInteger(generatorCost) ? generatorCost : Math.ceil(generatorCost);
   let totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
-  let difference = targetTotal - totalBilled;
+  const difference = targetTotal - totalBilled;
 
   if (difference > 0) {
     const topUpOrder = [...results].sort((a, b) => {
@@ -103,30 +99,6 @@ export function calculateBilling(
       const reading = topUpOrder[index % topUpOrder.length];
       reading.billedAmount += 1;
       reading.roundingAdjustment += 1;
-      refreshCarriedFraction(reading);
-    }
-  }
-
-  if (difference < 0) {
-    const discountOrder = [...results].sort((a, b) => {
-      const aFraction = rawFraction(a.rawAmount);
-      const bFraction = rawFraction(b.rawAmount);
-      const aIntegerPenalty = aFraction === 0 ? 1 : 0;
-      const bIntegerPenalty = bFraction === 0 ? 1 : 0;
-      return (
-        aIntegerPenalty - bIntegerPenalty ||
-        aFraction - bFraction ||
-        b.fractionFromPrev - a.fractionFromPrev ||
-        b.rawAmount - a.rawAmount ||
-        a.apartmentNumber.localeCompare(b.apartmentNumber, "ar")
-      );
-    });
-
-    for (let index = 0; index < Math.abs(difference); index += 1) {
-      const reading = discountOrder[index % discountOrder.length];
-      if (reading.billedAmount <= 0) continue;
-      reading.billedAmount -= 1;
-      reading.roundingAdjustment -= 1;
       refreshCarriedFraction(reading);
     }
   }

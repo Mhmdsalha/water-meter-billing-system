@@ -10,15 +10,15 @@ const result = calculateBilling(201, [
 assert.equal(result.totalCups, 20.4);
 assert.deepEqual(
   result.results.map((reading) => reading.billedAmount),
-  [83, 74, 44]
+  [83, 74, 45]
 );
-assert.equal(result.totalBilled, 201);
-assert.equal(result.totalDiscrepancy, 0);
+assert.equal(result.totalBilled, 202);
+assert.equal(result.totalDiscrepancy, -1);
 assert.equal(
   Number(result.results[0].fractionCarried.toFixed(10)),
   Number((result.results[0].rawAmount - result.results[0].billedAmount).toFixed(10))
 );
-assert.equal(result.results.reduce((sum, reading) => sum + reading.roundingAdjustment, 0), -1);
+assert.equal(result.results.reduce((sum, reading) => sum + reading.roundingAdjustment, 0), 0);
 
 const carriedBalanceResult = calculateBilling(318, [
   { apartmentId: 1, apartmentNumber: "1", previousReading: 910.5, currentReading: 914, fractionFromPrev: -0.9 },

@@ -98,8 +98,13 @@ function formatPdfDate(value: Date) {
 
 function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
   const totalDiscrepancy = Number(cycle.totalDiscrepancy ?? 0);
+  const surplus = Math.max(0, -totalDiscrepancy);
   const coverage =
-    totalDiscrepancy === 0 ? "مغطى بالكامل" : `فرق ${currency(Math.abs(totalDiscrepancy), 3)}`;
+    totalDiscrepancy === 0
+      ? "مغطى بالكامل"
+      : totalDiscrepancy < 0
+        ? `فائض ${currency(surplus, 3)}`
+        : `عجز ${currency(totalDiscrepancy, 3)}`;
 
   const rows = readings
     .map(
@@ -180,7 +185,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
 
           .summary {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 6px;
             margin-bottom: 8px;
           }
@@ -318,6 +323,10 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             <div class="summary-item">
               <div class="summary-label">إجمالي المستحق</div>
               <div class="summary-value">${currency(cycle.totalBilled)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">الفائض</div>
+              <div class="summary-value">${currency(surplus, 3)}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">تغطية المبلغ</div>

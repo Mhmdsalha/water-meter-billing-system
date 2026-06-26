@@ -47,32 +47,38 @@ export default async function CyclesPage() {
               </tr>
             </thead>
             <tbody>
-              {cycles.map((cycle) => (
-                <tr key={cycle.id}>
-                  <Td className="number">{cycle.weekStart}</Td>
-                  <Td className="number">₪ {formatMoney(cycle.generatorCost)}</Td>
-                  <Td className="number">{formatCups(cycle.totalCups, 2)}</Td>
-                  <Td className="number">₪ {formatMoney(cycle.totalBilled)}</Td>
-                  <Td className="number">
-                    {Number(cycle.totalDiscrepancy ?? 0) === 0
-                      ? "مغطى بالكامل"
-                      : `فرق ₪ ${formatMoney(Math.abs(Number(cycle.totalDiscrepancy ?? 0)), 3)}`}
-                  </Td>
-                  <Td>
-                    <Badge variant={cycle.status === "finalized" ? "success" : "warning"}>
-                      {cycle.status === "finalized" ? "مغلقة" : "مفتوحة"}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <Link
-                      href={`/cycles/${cycle.id}`}
-                      className="inline-flex min-h-9 items-center rounded-md border border-border bg-surface-strong/80 px-3 py-2 text-xs font-semibold hover:border-accent/60"
-                    >
-                      فتح
-                    </Link>
-                  </Td>
-                </tr>
-              ))}
+              {cycles.map((cycle) => {
+                const totalDiscrepancy = Number(cycle.totalDiscrepancy ?? 0);
+                const coverage =
+                  totalDiscrepancy === 0
+                    ? "مغطى بالكامل"
+                    : totalDiscrepancy < 0
+                      ? `فائض ₪ ${formatMoney(Math.abs(totalDiscrepancy), 3)}`
+                      : `عجز ₪ ${formatMoney(totalDiscrepancy, 3)}`;
+
+                return (
+                  <tr key={cycle.id}>
+                    <Td className="number">{cycle.weekStart}</Td>
+                    <Td className="number">₪ {formatMoney(cycle.generatorCost)}</Td>
+                    <Td className="number">{formatCups(cycle.totalCups, 2)}</Td>
+                    <Td className="number">₪ {formatMoney(cycle.totalBilled)}</Td>
+                    <Td className="number">{coverage}</Td>
+                    <Td>
+                      <Badge variant={cycle.status === "finalized" ? "success" : "warning"}>
+                        {cycle.status === "finalized" ? "مغلقة" : "مفتوحة"}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <Link
+                        href={`/cycles/${cycle.id}`}
+                        className="inline-flex min-h-9 items-center rounded-md border border-border bg-surface-strong/80 px-3 py-2 text-xs font-semibold hover:border-accent/60"
+                      >
+                        فتح
+                      </Link>
+                    </Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         </TableWrap>
