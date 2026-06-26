@@ -35,11 +35,11 @@ const carriedBalanceResult = calculateBilling(318, [
 
 const ammar = carriedBalanceResult.results.find((reading) => reading.apartmentNumber === "7");
 const topUpApartment = carriedBalanceResult.results.find((reading) => reading.apartmentNumber === "1");
-assert.equal(carriedBalanceResult.totalBilled, 318);
-assert.equal(carriedBalanceResult.totalDiscrepancy, 0);
+assert.equal(carriedBalanceResult.totalBilled, 317);
+assert.equal(carriedBalanceResult.totalDiscrepancy, 1);
 assert.equal(ammar?.rawAmount.toFixed(4), "23.8927");
 assert.equal(ammar?.billedAmount, 24);
-assert.equal(topUpApartment?.roundingAdjustment, 1);
+assert.equal(topUpApartment?.roundingAdjustment, 0);
 
 assert.throws(
   () =>

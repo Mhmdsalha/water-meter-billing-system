@@ -30,10 +30,6 @@ function naturalBill(rawAmount: number) {
   return Math.max(0, Math.ceil(rawAmount));
 }
 
-function refreshCarriedFraction(result: BillingResult) {
-  result.fractionCarried = fixed(result.rawAmount - result.billedAmount);
-}
-
 export function calculateBilling(
   generatorCost: number,
   readings: ReadingInput[]
@@ -79,31 +75,7 @@ export function calculateBilling(
     };
   });
 
-  const targetTotal = Number.isInteger(generatorCost) ? generatorCost : Math.ceil(generatorCost);
   let totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
-  const difference = targetTotal - totalBilled;
-
-  if (difference > 0) {
-    const topUpOrder = [...results].sort((a, b) => {
-      const aPreviousCredit = Math.max(0, -a.fractionFromPrev);
-      const bPreviousCredit = Math.max(0, -b.fractionFromPrev);
-      return (
-        bPreviousCredit - aPreviousCredit ||
-        b.cupsConsumed - a.cupsConsumed ||
-        b.rawAmount - a.rawAmount ||
-        a.apartmentNumber.localeCompare(b.apartmentNumber, "ar")
-      );
-    });
-
-    for (let index = 0; index < difference; index += 1) {
-      const reading = topUpOrder[index % topUpOrder.length];
-      reading.billedAmount += 1;
-      reading.roundingAdjustment += 1;
-      refreshCarriedFraction(reading);
-    }
-  }
-
-  totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
   const totalDiscrepancy = fixed(generatorCost - totalBilled);
 
   return { totalCups, exactPricePerCup, results, totalBilled, totalDiscrepancy };
