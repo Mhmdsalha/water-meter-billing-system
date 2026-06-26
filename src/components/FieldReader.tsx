@@ -171,15 +171,24 @@ export function FieldReader() {
     }
   }
 
-  function downloadPdf(cycleId: number, weekStart?: string) {
+  async function downloadPdf(cycleId: number, weekStart?: string) {
     const pdfUrl = `/api/pdf/${cycleId}?download=1`;
     setReportUrl(pdfUrl);
+    const response = await fetch(pdfUrl);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!response.ok || !contentType.includes("application/pdf")) {
+      throw new Error("تعذر تنزيل ملف PDF");
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = pdfUrl;
+    link.href = objectUrl;
     link.download = `water-cycle-${cycleId}${weekStart ? `-${weekStart}` : ""}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
+    URL.revokeObjectURL(objectUrl);
   }
 
   async function approveCycle() {
@@ -209,7 +218,7 @@ export function FieldReader() {
       await saveFieldPayload([]);
       await loadLocal();
       setMessage(`تم اعتماد الدورة رقم ${data.cycle.id} وتجهيز الفاتورة`);
-      downloadPdf(data.cycle.id, data.cycle.weekStart);
+      await downloadPdf(data.cycle.id, data.cycle.weekStart);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
       await loadLocal();

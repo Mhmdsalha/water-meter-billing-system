@@ -45,26 +45,33 @@ function fontFaces() {
 }
 
 async function getBrowserLaunchOptions() {
-  const candidates = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-  ].filter(Boolean) as string[];
+  const useLocalBrowser = !process.env.VERCEL && !process.env.FORCE_SERVERLESS_CHROMIUM;
+  const candidates = useLocalBrowser
+    ? ([
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+      ].filter(Boolean) as string[])
+    : [];
 
-  const browser = candidates.find((candidate) => fs.existsSync(candidate));
-  if (browser) {
+  const localBrowser = candidates.find((candidate) => fs.existsSync(candidate));
+  if (localBrowser) {
     return {
-      executablePath: browser,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=medium"]
+      executablePath: localBrowser,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=medium"],
+      headless: true
     };
   }
 
   const chromium = (await import("@sparticuz/chromium")).default;
+  chromium.setGraphicsMode = false;
+
   return {
     executablePath: await chromium.executablePath(),
-    args: [...chromium.args, "--font-render-hinting=medium"]
+    args: [...chromium.args, "--font-render-hinting=medium", "--disable-dev-shm-usage"],
+    headless: true
   };
 }
 
@@ -357,7 +364,7 @@ export async function generateCycleReportPdf(cycle: CycleRow, readings: ReadingR
   const launchOptions = await getBrowserLaunchOptions();
   const browser = await puppeteer.launch({
     executablePath: launchOptions.executablePath,
-    headless: true,
+    headless: launchOptions.headless,
     args: launchOptions.args
   });
 

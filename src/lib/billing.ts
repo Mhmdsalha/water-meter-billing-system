@@ -54,7 +54,7 @@ export function calculateBilling(
   const results = withConsumption.map((reading) => {
     const consumptionCost = reading.cupsConsumed * exactPricePerCup;
     const rawAmount = fixed(consumptionCost + reading.fractionFromPrev);
-    const billedAmount = Math.floor(rawAmount);
+    const billedAmount = rawAmount > Math.floor(rawAmount) ? Math.ceil(rawAmount) : rawAmount;
 
     return {
       apartmentId: reading.apartmentId,
@@ -71,24 +71,7 @@ export function calculateBilling(
     };
   });
 
-  const targetTotal = Number.isInteger(generatorCost) ? generatorCost : Math.ceil(generatorCost);
-  let totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
-  let missing = Math.max(0, targetTotal - totalBilled);
-
-  const byLargestFraction = [...results].sort((a, b) => {
-    const aFraction = fixed(a.rawAmount - Math.floor(a.rawAmount));
-    const bFraction = fixed(b.rawAmount - Math.floor(b.rawAmount));
-    return bFraction - aFraction || a.apartmentNumber.localeCompare(b.apartmentNumber, "ar");
-  });
-
-  for (let index = 0; index < missing; index += 1) {
-    const reading = byLargestFraction[index % byLargestFraction.length];
-    reading.billedAmount += 1;
-    reading.roundingAdjustment += 1;
-    reading.fractionCarried = fixed(reading.rawAmount - reading.billedAmount);
-  }
-
-  totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
+  const totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
   const totalDiscrepancy = fixed(generatorCost - totalBilled);
 
   return { totalCups, exactPricePerCup, results, totalBilled, totalDiscrepancy };
