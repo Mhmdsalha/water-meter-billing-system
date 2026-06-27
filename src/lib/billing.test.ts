@@ -38,8 +38,8 @@ const borrowedApartment = carriedBalanceResult.results.find((reading) => reading
 assert.equal(carriedBalanceResult.totalBilled, 318);
 assert.equal(carriedBalanceResult.totalDiscrepancy, 0);
 assert.equal(ammar?.rawAmount.toFixed(4), "23.8927");
-assert.equal(ammar?.billedAmount, 24);
-assert.equal(borrowedApartment?.apartmentNumber, "6");
+assert.equal(ammar?.billedAmount, 25);
+assert.equal(borrowedApartment?.apartmentNumber, "7");
 assert.equal(borrowedApartment?.fractionCarried < -1, true);
 
 const rotatedBorrowResult = calculateBilling(
@@ -56,10 +56,10 @@ const rotatedBorrowResult = calculateBilling(
     { apartmentId: 9, apartmentNumber: "9", previousReading: 519.5, currentReading: 522, fractionFromPrev: -0.25 },
     { apartmentId: 10, apartmentNumber: "10", previousReading: 534, currentReading: 537, fractionFromPrev: -0.48 }
   ],
-  { borrowCountsByApartmentId: { 6: 1 } }
+  { borrowCountsByApartmentId: { 7: 1 } }
 );
 const rotatedBorrowedApartment = rotatedBorrowResult.results.find((reading) => reading.roundingAdjustment === 1);
-assert.equal(rotatedBorrowedApartment?.apartmentNumber, "5");
+assert.equal(rotatedBorrowedApartment?.apartmentNumber, "9");
 
 assert.throws(
   () =>

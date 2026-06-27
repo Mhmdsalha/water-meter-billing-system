@@ -46,6 +46,10 @@ function refreshCarriedFraction(result: BillingResult) {
   result.fractionCarried = fixed(result.rawAmount - result.billedAmount);
 }
 
+function projectedBorrowBalance(result: BillingResult) {
+  return Math.abs(fixed(result.rawAmount - (result.billedAmount + 1)));
+}
+
 export function calculateBilling(
   generatorCost: number,
   readings: ReadingInput[],
@@ -100,12 +104,12 @@ export function calculateBilling(
     const borrowOrder = [...results].sort((a, b) => {
       const aBorrowCount = getBorrowCount(options.borrowCountsByApartmentId, a.apartmentId);
       const bBorrowCount = getBorrowCount(options.borrowCountsByApartmentId, b.apartmentId);
-      const aPreviousCredit = Math.max(0, -a.fractionFromPrev);
-      const bPreviousCredit = Math.max(0, -b.fractionFromPrev);
+      const aProjectedBorrowBalance = projectedBorrowBalance(a);
+      const bProjectedBorrowBalance = projectedBorrowBalance(b);
 
       return (
         aBorrowCount - bBorrowCount ||
-        aPreviousCredit - bPreviousCredit ||
+        aProjectedBorrowBalance - bProjectedBorrowBalance ||
         b.cupsConsumed - a.cupsConsumed ||
         b.rawAmount - a.rawAmount ||
         a.apartmentNumber.localeCompare(b.apartmentNumber, "ar")
