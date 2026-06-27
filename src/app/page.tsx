@@ -20,6 +20,12 @@ export default async function DashboardPage() {
   const progress = totalReadings ? Math.round((readCount / totalReadings) * 100) : 0;
   const totalDue = latest?.readings.reduce((sum, reading) => sum + Number(reading.billedAmount ?? 0), 0) ?? 0;
   const surplus = Math.max(0, -Number(cycle?.totalDiscrepancy ?? 0));
+  const cumulativeCoverage =
+    data.coverageBalance === 0
+      ? "متوازن"
+      : data.coverageBalance > 0
+        ? `فائض ₪ ${formatMoney(data.coverageBalance, 3)}`
+        : `عجز ₪ ${formatMoney(Math.abs(data.coverageBalance), 3)}`;
 
   return (
     <div className="space-y-6">
@@ -35,11 +41,16 @@ export default async function DashboardPage() {
             </Badge>
           </CardHeader>
           {cycle ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <MetricCard label="تاريخ القراءة" value={cycle.weekStart} valueClassName="text-lg" />
               <MetricCard label="تكلفة المولد" value={`₪ ${formatMoney(cycle.generatorCost)}`} valueClassName="text-2xl text-accent" />
               <MetricCard label="مستحقات الدورة" value={`₪ ${formatMoney(totalDue)}`} valueClassName="text-2xl text-success" />
               <MetricCard label="الفائض" value={`₪ ${formatMoney(surplus, 3)}`} valueClassName="text-2xl text-accent" />
+              <MetricCard
+                label="الرصيد التراكمي"
+                value={cumulativeCoverage}
+                valueClassName={data.coverageBalance >= 0 ? "text-2xl text-success" : "text-2xl text-warning"}
+              />
             </div>
           ) : (
             <p className="text-text-muted">ابدأ بإنشاء دورة جديدة لإظهار الإحصاءات.</p>

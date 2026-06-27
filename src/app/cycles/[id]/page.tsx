@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { WaterProgress } from "@/components/WaterProgress";
-import { getCycleDetail } from "@/lib/db/queries";
+import { getCycleCoverageBalance, getCycleDetail } from "@/lib/db/queries";
 import { formatCups, formatMoney } from "@/lib/format";
 import { ArrowLeft, ClipboardList, FileText, ReceiptText } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +24,13 @@ export default async function CycleDetailPage({ params }: { params: { id: string
       : totalDiscrepancy < 0
         ? `فائض ₪ ${formatMoney(surplus, 3)}`
         : `عجز ₪ ${formatMoney(totalDiscrepancy, 3)}`;
+  const coverageBalance = await getCycleCoverageBalance(detail.cycle.id);
+  const cumulativeCoverage =
+    coverageBalance === 0
+      ? "متوازن"
+      : coverageBalance > 0
+        ? `فائض ₪ ${formatMoney(coverageBalance, 3)}`
+        : `عجز ₪ ${formatMoney(Math.abs(coverageBalance), 3)}`;
 
   return (
     <div className="space-y-5">
@@ -37,12 +44,13 @@ export default async function CycleDetailPage({ params }: { params: { id: string
             {detail.cycle.status === "finalized" ? "مغلقة" : "مفتوحة"}
           </Badge>
         </CardHeader>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <MetricCard label="تكلفة المولد" value={`₪ ${formatMoney(detail.cycle.generatorCost)}`} />
           <MetricCard label="إجمالي الأكواب" value={formatCups(detail.cycle.totalCups, 2)} />
           <MetricCard label="سعر الكوب" value={`₪ ${formatMoney(detail.cycle.exactPricePerCup, 4)}`} />
           <MetricCard label="المستحق" value={`₪ ${formatMoney(detail.cycle.totalBilled)}`} />
           <MetricCard label="الفائض" value={`₪ ${formatMoney(surplus, 3)}`} valueClassName="text-accent" />
+          <MetricCard label="الرصيد التراكمي" value={cumulativeCoverage} valueClassName={coverageBalance >= 0 ? "text-success" : "text-warning"} />
           <MetricCard
             label="تغطية المبلغ"
             value={coverage}
@@ -50,7 +58,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
           />
         </div>
         <p className="mt-4 rounded-md border border-success/40 bg-success/10 p-3 text-sm leading-6 text-success">
-          يتم تحصيل مبالغ الشقق بالأرقام الصحيحة، وأي زيادة عن تكلفة المولد تظهر كفائض للدورة بدل خصمها من شقق أخرى.
+          يتم تحصيل مبالغ الشقق بالأرقام الصحيحة، وأي زيادة أو نقص يظهر في رصيد التغطية التراكمي بدل تحميله على شقة واحدة.
         </p>
         <div className="mt-5">
           <WaterProgress value={progress} label={`تمت قراءة ${readCount} من ${detail.readings.length} شقة`} />

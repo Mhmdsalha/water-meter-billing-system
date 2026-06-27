@@ -255,6 +255,17 @@ export async function getCycleDetail(id: number) {
   };
 }
 
+export async function getCycleCoverageBalance(id: number) {
+  const row = await getRow(
+    `SELECT COALESCE(SUM(COALESCE(total_billed, 0) - generator_cost), 0) as balance
+     FROM billing_cycles
+     WHERE status = 'finalized' AND id <= ?`,
+    [id]
+  );
+
+  return Number(row?.balance ?? 0);
+}
+
 export async function getLatestOpenCycle() {
   const row = await getRow(
     `SELECT id, week_start as weekStart, week_end as weekEnd, generator_cost as generatorCost,
@@ -493,11 +504,13 @@ export async function getDashboardData() {
   const cycles = await getCycles();
   const latestCycleId = openCycle?.id ?? cycles[0]?.id;
   const latestDetail = latestCycleId ? await getCycleDetail(latestCycleId) : null;
+  const coverageBalance = latestCycleId ? await getCycleCoverageBalance(latestCycleId) : 0;
   const apartments = await getApartments(false);
 
   return {
     openCycle,
     latestDetail,
+    coverageBalance,
     apartmentsCount: apartments.length,
     cycles: cycles.slice(0, 4)
   };
