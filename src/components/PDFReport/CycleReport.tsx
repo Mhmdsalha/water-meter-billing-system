@@ -80,13 +80,8 @@ const styles = StyleSheet.create({
 export function CycleReport({ cycle, readings }: { cycle: CycleRow; readings: ReadingRow[] }) {
   const today = new Date().toLocaleDateString("ar-SA");
   const totalDiscrepancy = Number(cycle.totalDiscrepancy ?? 0);
-  const surplus = Math.max(0, -totalDiscrepancy);
   const coverage =
-    totalDiscrepancy === 0
-      ? "مغطى بالكامل"
-      : totalDiscrepancy < 0
-        ? `فائض ₪ ${formatMoney(surplus, 3)}`
-        : `عجز ₪ ${formatMoney(totalDiscrepancy, 3)}`;
+    totalDiscrepancy <= 0 ? "مغطى بالكامل" : `غير مغطى ₪ ${formatMoney(totalDiscrepancy, 3)}`;
   const fractions = readings
     .filter((reading) => Number(reading.fractionCarried ?? 0) > 0)
     .map((reading) => `${reading.apartmentNumber}: ${formatMoney(reading.fractionCarried, 3)} ₪`)
@@ -106,7 +101,6 @@ export function CycleReport({ cycle, readings }: { cycle: CycleRow; readings: Re
           <Text>إجمالي الأكواب: {formatCups(cycle.totalCups, 2)} كوب</Text>
           <Text>سعر الكوب: ₪ {formatMoney(cycle.exactPricePerCup, 4)}</Text>
           <Text>إجمالي المستحق: ₪ {formatMoney(cycle.totalBilled)}</Text>
-          <Text>الفائض: ₪ {formatMoney(surplus, 3)}</Text>
           <Text>تغطية المبلغ: {coverage}</Text>
         </View>
 

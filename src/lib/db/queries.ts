@@ -255,15 +255,19 @@ export async function getCycleDetail(id: number) {
   };
 }
 
-export async function getCycleCoverageBalance(id: number) {
-  const row = await getRow(
-    `SELECT COALESCE(SUM(COALESCE(total_billed, 0) - generator_cost), 0) as balance
-     FROM billing_cycles
-     WHERE status = 'finalized' AND id <= ?`,
+async function getBorrowCountsBeforeCycle(id: number) {
+  const rows = await allRows(
+    `SELECT mr.apartment_id as apartmentId, COUNT(*) as borrowCount
+     FROM meter_readings mr
+     JOIN billing_cycles c ON c.id = mr.cycle_id
+     WHERE c.status = 'finalized'
+       AND mr.cycle_id < ?
+       AND COALESCE(mr.fraction_carried, 0) < -1
+     GROUP BY mr.apartment_id`,
     [id]
   );
 
-  return Number(row?.balance ?? 0);
+  return Object.fromEntries(rows.map((row) => [Number(row.apartmentId), Number(row.borrowCount)]));
 }
 
 export async function getLatestOpenCycle() {
@@ -459,6 +463,7 @@ export async function finalizeCycle(id: number) {
     throw new Error("لا يمكن إغلاق الدورة قبل إدخال قراءة واحدة على الأقل");
   }
 
+  const borrowCountsByApartmentId = await getBorrowCountsBeforeCycle(id);
   const billing = calculateBilling(
     detail.cycle.generatorCost,
     detail.readings.map((reading) => ({
@@ -467,7 +472,8 @@ export async function finalizeCycle(id: number) {
       previousReading: reading.previousReading,
       currentReading: reading.currentReading,
       fractionFromPrev: reading.fractionFromPrev
-    }))
+    })),
+    { borrowCountsByApartmentId }
   );
 
   await batchSql(
@@ -504,13 +510,11 @@ export async function getDashboardData() {
   const cycles = await getCycles();
   const latestCycleId = openCycle?.id ?? cycles[0]?.id;
   const latestDetail = latestCycleId ? await getCycleDetail(latestCycleId) : null;
-  const coverageBalance = latestCycleId ? await getCycleCoverageBalance(latestCycleId) : 0;
   const apartments = await getApartments(false);
 
   return {
     openCycle,
     latestDetail,
-    coverageBalance,
     apartmentsCount: apartments.length,
     cycles: cycles.slice(0, 4)
   };

@@ -34,12 +34,32 @@ const carriedBalanceResult = calculateBilling(318, [
 ]);
 
 const ammar = carriedBalanceResult.results.find((reading) => reading.apartmentNumber === "7");
-const topUpApartment = carriedBalanceResult.results.find((reading) => reading.apartmentNumber === "1");
-assert.equal(carriedBalanceResult.totalBilled, 317);
-assert.equal(carriedBalanceResult.totalDiscrepancy, 1);
+const borrowedApartment = carriedBalanceResult.results.find((reading) => reading.roundingAdjustment === 1);
+assert.equal(carriedBalanceResult.totalBilled, 318);
+assert.equal(carriedBalanceResult.totalDiscrepancy, 0);
 assert.equal(ammar?.rawAmount.toFixed(4), "23.8927");
 assert.equal(ammar?.billedAmount, 24);
-assert.equal(topUpApartment?.roundingAdjustment, 0);
+assert.equal(borrowedApartment?.apartmentNumber, "6");
+assert.equal(borrowedApartment?.fractionCarried < -1, true);
+
+const rotatedBorrowResult = calculateBilling(
+  318,
+  [
+    { apartmentId: 1, apartmentNumber: "1", previousReading: 910.5, currentReading: 914, fractionFromPrev: -0.9 },
+    { apartmentId: 2, apartmentNumber: "2", previousReading: 51.5, currentReading: 53.2, fractionFromPrev: -0.84 },
+    { apartmentId: 3, apartmentNumber: "3", previousReading: 47.1, currentReading: 47.7, fractionFromPrev: -0.19 },
+    { apartmentId: 4, apartmentNumber: "4", previousReading: 1425, currentReading: 1427, fractionFromPrev: -0.32 },
+    { apartmentId: 5, apartmentNumber: "5", previousReading: 356, currentReading: 358, fractionFromPrev: -0.17 },
+    { apartmentId: 6, apartmentNumber: "6", previousReading: 488.5, currentReading: 491, fractionFromPrev: -0.06 },
+    { apartmentId: 7, apartmentNumber: "7", previousReading: 441.1, currentReading: 442.8, fractionFromPrev: -0.68 },
+    { apartmentId: 8, apartmentNumber: "8", previousReading: 3306, currentReading: 3308.5, fractionFromPrev: -0.72 },
+    { apartmentId: 9, apartmentNumber: "9", previousReading: 519.5, currentReading: 522, fractionFromPrev: -0.25 },
+    { apartmentId: 10, apartmentNumber: "10", previousReading: 534, currentReading: 537, fractionFromPrev: -0.48 }
+  ],
+  { borrowCountsByApartmentId: { 6: 1 } }
+);
+const rotatedBorrowedApartment = rotatedBorrowResult.results.find((reading) => reading.roundingAdjustment === 1);
+assert.equal(rotatedBorrowedApartment?.apartmentNumber, "5");
 
 assert.throws(
   () =>

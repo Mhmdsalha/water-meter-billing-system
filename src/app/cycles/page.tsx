@@ -50,11 +50,9 @@ export default async function CyclesPage() {
               {cycles.map((cycle) => {
                 const totalDiscrepancy = Number(cycle.totalDiscrepancy ?? 0);
                 const coverage =
-                  totalDiscrepancy === 0
+                  totalDiscrepancy <= 0
                     ? "مغطى بالكامل"
-                    : totalDiscrepancy < 0
-                      ? `فائض ₪ ${formatMoney(Math.abs(totalDiscrepancy), 3)}`
-                      : `عجز ₪ ${formatMoney(totalDiscrepancy, 3)}`;
+                    : `غير مغطى ₪ ${formatMoney(totalDiscrepancy, 3)}`;
 
                 return (
                   <tr key={cycle.id}>

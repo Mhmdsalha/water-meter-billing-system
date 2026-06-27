@@ -22,6 +22,12 @@ export interface BillingResult {
   fractionCarried: number;
 }
 
+type BorrowCounts = Map<number, number> | Record<number, number>;
+
+interface BillingOptions {
+  borrowCountsByApartmentId?: BorrowCounts;
+}
+
 function fixed(value: number) {
   return parseFloat(value.toFixed(STORAGE_PRECISION));
 }
@@ -30,9 +36,20 @@ function naturalBill(rawAmount: number) {
   return Math.max(0, Math.ceil(rawAmount));
 }
 
+function getBorrowCount(counts: BorrowCounts | undefined, apartmentId: number) {
+  if (!counts) return 0;
+  if (counts instanceof Map) return counts.get(apartmentId) ?? 0;
+  return counts[apartmentId] ?? 0;
+}
+
+function refreshCarriedFraction(result: BillingResult) {
+  result.fractionCarried = fixed(result.rawAmount - result.billedAmount);
+}
+
 export function calculateBilling(
   generatorCost: number,
-  readings: ReadingInput[]
+  readings: ReadingInput[],
+  options: BillingOptions = {}
 ): {
   totalCups: number;
   exactPricePerCup: number;
@@ -75,7 +92,35 @@ export function calculateBilling(
     };
   });
 
+  const targetTotal = Number.isInteger(generatorCost) ? generatorCost : Math.ceil(generatorCost);
   let totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
+  const shortage = targetTotal - totalBilled;
+
+  if (shortage > 0) {
+    const borrowOrder = [...results].sort((a, b) => {
+      const aBorrowCount = getBorrowCount(options.borrowCountsByApartmentId, a.apartmentId);
+      const bBorrowCount = getBorrowCount(options.borrowCountsByApartmentId, b.apartmentId);
+      const aPreviousCredit = Math.max(0, -a.fractionFromPrev);
+      const bPreviousCredit = Math.max(0, -b.fractionFromPrev);
+
+      return (
+        aBorrowCount - bBorrowCount ||
+        aPreviousCredit - bPreviousCredit ||
+        b.cupsConsumed - a.cupsConsumed ||
+        b.rawAmount - a.rawAmount ||
+        a.apartmentNumber.localeCompare(b.apartmentNumber, "ar")
+      );
+    });
+
+    for (let index = 0; index < shortage; index += 1) {
+      const reading = borrowOrder[index % borrowOrder.length];
+      reading.billedAmount += 1;
+      reading.roundingAdjustment += 1;
+      refreshCarriedFraction(reading);
+    }
+  }
+
+  totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
   const totalDiscrepancy = fixed(generatorCost - totalBilled);
 
   return { totalCups, exactPricePerCup, results, totalBilled, totalDiscrepancy };
