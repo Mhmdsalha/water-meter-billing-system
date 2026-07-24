@@ -50,6 +50,10 @@ function projectedBorrowBalance(result: BillingResult) {
   return Math.abs(fixed(result.rawAmount - (result.billedAmount + 1)));
 }
 
+function projectedCreditBalance(result: BillingResult) {
+  return Math.abs(fixed(result.rawAmount - (result.billedAmount - 1)));
+}
+
 export function calculateBilling(
   generatorCost: number,
   readings: ReadingInput[],
@@ -120,6 +124,28 @@ export function calculateBilling(
       const reading = borrowOrder[index % borrowOrder.length];
       reading.billedAmount += 1;
       reading.roundingAdjustment += 1;
+      refreshCarriedFraction(reading);
+    }
+  }
+
+  if (shortage < 0) {
+    const creditOrder = [...results]
+      .filter((reading) => reading.billedAmount > 0)
+      .sort(
+        (a, b) =>
+          projectedCreditBalance(a) - projectedCreditBalance(b) ||
+          b.cupsConsumed - a.cupsConsumed ||
+          b.rawAmount - a.rawAmount ||
+          a.apartmentNumber.localeCompare(b.apartmentNumber, "ar")
+      );
+
+    for (let index = 0; index < Math.abs(shortage); index += 1) {
+      const reading = creditOrder[index];
+      if (!reading) {
+        throw new Error("تعذر توزيع الرصيد الزائد على الشقق");
+      }
+      reading.billedAmount -= 1;
+      reading.roundingAdjustment -= 1;
       refreshCarriedFraction(reading);
     }
   }

@@ -292,6 +292,7 @@ export function FieldReader() {
         {reportUrl ? (
           <a
             href={reportUrl}
+            download
             className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg hover:bg-accent-dim"
           >
             <FileText className="h-5 w-5" />

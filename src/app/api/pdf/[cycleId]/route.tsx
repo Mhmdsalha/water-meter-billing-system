@@ -23,6 +23,8 @@ export async function GET(request: Request, { params }: { params: { cycleId: str
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": disposition,
+        "Content-Length": String(buffer.length),
+        "Content-Transfer-Encoding": "binary",
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff"
       }

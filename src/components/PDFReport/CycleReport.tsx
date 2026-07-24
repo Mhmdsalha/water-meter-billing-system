@@ -70,6 +70,15 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     fontSize: 9
   },
+  signature: {
+    position: "absolute",
+    bottom: 6,
+    left: 28,
+    right: 28,
+    color: "#9ca3af",
+    fontSize: 7,
+    textAlign: "center"
+  },
   fractions: {
     marginTop: 12,
     border: "1 solid #d1d5db",
@@ -100,7 +109,6 @@ export function CycleReport({ cycle, readings }: { cycle: CycleRow; readings: Re
           <Text>تكلفة المولد: ₪ {formatMoney(cycle.generatorCost)}</Text>
           <Text>إجمالي الأكواب: {formatCups(cycle.totalCups, 2)} كوب</Text>
           <Text>سعر الكوب: ₪ {formatMoney(cycle.exactPricePerCup, 4)}</Text>
-          <Text>إجمالي المستحق: ₪ {formatMoney(cycle.totalBilled)}</Text>
           <Text>تغطية المبلغ: {coverage}</Text>
         </View>
 
@@ -134,6 +142,7 @@ export function CycleReport({ cycle, readings }: { cycle: CycleRow; readings: Re
           <Text>نظام إدارة العمارة</Text>
           <Text render={({ pageNumber, totalPages }) => `صفحة ${pageNumber} من ${totalPages}`} />
         </View>
+        <Text style={styles.signature} fixed>Mohammed Salha</Text>
       </Page>
     </Document>
   );

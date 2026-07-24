@@ -10,15 +10,35 @@ const result = calculateBilling(201, [
 assert.equal(result.totalCups, 20.4);
 assert.deepEqual(
   result.results.map((reading) => reading.billedAmount),
-  [83, 74, 45]
+  [83, 74, 44]
 );
-assert.equal(result.totalBilled, 202);
-assert.equal(result.totalDiscrepancy, -1);
+assert.equal(result.totalBilled, 201);
+assert.equal(result.totalDiscrepancy, 0);
 assert.equal(
   Number(result.results[0].fractionCarried.toFixed(10)),
   Number((result.results[0].rawAmount - result.results[0].billedAmount).toFixed(10))
 );
-assert.equal(result.results.reduce((sum, reading) => sum + reading.roundingAdjustment, 0), 0);
+assert.equal(result.results.reduce((sum, reading) => sum + reading.roundingAdjustment, 0), -1);
+
+const cycle34Result = calculateBilling(310.4, [
+  { apartmentId: 1, apartmentNumber: "1", previousReading: 930, currentReading: 933, fractionFromPrev: -0.13 },
+  { apartmentId: 2, apartmentNumber: "2", previousReading: 61.5, currentReading: 63.8, fractionFromPrev: -0.18 },
+  { apartmentId: 3, apartmentNumber: "3", previousReading: 52.1, currentReading: 54, fractionFromPrev: -0.75 },
+  { apartmentId: 4, apartmentNumber: "4", previousReading: 1438, currentReading: 1441, fractionFromPrev: -0.37 },
+  { apartmentId: 5, apartmentNumber: "5", previousReading: 366, currentReading: 367, fractionFromPrev: -0.09 },
+  { apartmentId: 6, apartmentNumber: "6", previousReading: 501, currentReading: 504, fractionFromPrev: -0.68 },
+  { apartmentId: 7, apartmentNumber: "7", previousReading: 449.7, currentReading: 451.8, fractionFromPrev: -0.97 },
+  { apartmentId: 8, apartmentNumber: "8", previousReading: 3318.5, currentReading: 3322, fractionFromPrev: -0.08 },
+  { apartmentId: 9, apartmentNumber: "9", previousReading: 531, currentReading: 535, fractionFromPrev: -0.14 },
+  { apartmentId: 10, apartmentNumber: "10", previousReading: 549, currentReading: 552, fractionFromPrev: -0.01 }
+]);
+
+assert.deepEqual(
+  cycle34Result.results.map((reading) => reading.billedAmount),
+  [35, 27, 22, 35, 12, 34, 24, 41, 46, 35]
+);
+assert.equal(cycle34Result.totalBilled, 311);
+assert.equal(cycle34Result.totalDiscrepancy, -0.6);
 
 const carriedBalanceResult = calculateBilling(318, [
   { apartmentId: 1, apartmentNumber: "1", previousReading: 910.5, currentReading: 914, fractionFromPrev: -0.9 },

@@ -145,6 +145,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
 
           .page {
             width: 100%;
+            padding: 0 2px;
           }
 
           .header {
@@ -180,7 +181,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
 
           .summary {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 6px;
             margin-bottom: 8px;
           }
@@ -287,6 +288,14 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             color: #64748b;
             font-size: 9px;
           }
+
+          .signature {
+            margin-top: 3px;
+            direction: ltr;
+            color: #94a3b8;
+            font-size: 8px;
+            text-align: center;
+          }
         </style>
       </head>
       <body>
@@ -314,10 +323,6 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             <div class="summary-item">
               <div class="summary-label">سعر الكوب</div>
               <div class="summary-value">${currency(cycle.exactPricePerCup, 4)}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">إجمالي المستحق</div>
-              <div class="summary-value">${currency(cycle.totalBilled)}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">تغطية المبلغ</div>
@@ -355,6 +360,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             <span>نظام إدارة العمارة</span>
             <span>تم توليد التقرير تلقائيًا بعد احتساب الفوترة</span>
           </section>
+          <div class="signature">Mohammed Salha</div>
         </main>
       </body>
     </html>`;
