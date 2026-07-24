@@ -1,4 +1,4 @@
-import { getCycleDetail, updateCycleDetails } from "@/lib/db/queries";
+import { deleteCycle, getCycleDetail, updateCycleDetails } from "@/lib/db/queries";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       notes: body.notes
     });
     return NextResponse.json(detail);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "حدث خطأ غير متوقع" }, { status: 400 });
+  }
+}
+
+export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+  try {
+    return NextResponse.json(await deleteCycle(Number(params.id)));
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "حدث خطأ غير متوقع" }, { status: 400 });
   }

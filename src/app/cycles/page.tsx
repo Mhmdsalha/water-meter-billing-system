@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
+import { CycleDeleteButton } from "@/components/CycleDeleteButton";
 import { getCycles } from "@/lib/db/queries";
 import { formatCups, formatMoney } from "@/lib/format";
 import { CalendarPlus } from "lucide-react";
@@ -66,14 +67,17 @@ export default async function CyclesPage() {
                         {cycle.status === "finalized" ? "مغلقة" : "مفتوحة"}
                       </Badge>
                     </Td>
-                    <Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-2">
                       <Link
                         href={`/cycles/${cycle.id}`}
                         className="inline-flex min-h-9 items-center rounded-md border border-border bg-surface-strong/80 px-3 py-2 text-xs font-semibold hover:border-accent/60"
                       >
                         فتح
                       </Link>
-                    </Td>
+                      <CycleDeleteButton cycleId={cycle.id} label={`دورة ${cycle.weekStart}`} />
+                    </div>
+                  </Td>
                   </tr>
                 );
               })}

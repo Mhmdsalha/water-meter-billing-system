@@ -21,6 +21,7 @@ export const billingCycles = sqliteTable("billing_cycles", {
   totalDiscrepancy: real("total_discrepancy"),
   status: text("status").default("open"),
   notes: text("notes"),
+  clientRequestId: text("client_request_id"),
   createdAt: text("created_at").default(sql`(datetime('now'))`)
 });
 

@@ -35,6 +35,7 @@ export async function initDb(client: Client = sqlite) {
           total_discrepancy REAL,
           status TEXT DEFAULT 'open',
           notes TEXT,
+          client_request_id TEXT,
           created_at TEXT DEFAULT (datetime('now'))
         )`
       },
@@ -73,6 +74,16 @@ export async function initDb(client: Client = sqlite) {
     ],
     "write"
   );
+
+  try {
+    await client.execute("ALTER TABLE billing_cycles ADD COLUMN client_request_id TEXT");
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.toLowerCase().includes("duplicate")) {
+      throw error;
+    }
+  }
+
+  await client.execute("CREATE UNIQUE INDEX IF NOT EXISTS billing_cycles_client_request_unique ON billing_cycles(client_request_id)");
 }
 
 export async function ensureDb(client: Client = sqlite) {

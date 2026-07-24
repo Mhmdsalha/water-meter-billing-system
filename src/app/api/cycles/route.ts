@@ -15,7 +15,8 @@ export async function POST(request: Request) {
       weekStart: readingDate,
       weekEnd: String(body.weekEnd ?? readingDate),
       generatorCost: Number(body.generatorCost),
-      notes: body.notes ?? null
+      notes: body.notes ?? null,
+      clientRequestId: body.clientRequestId ?? null
     });
     return NextResponse.json(cycle, { status: 201 });
   } catch (error) {

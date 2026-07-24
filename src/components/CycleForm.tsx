@@ -7,31 +7,43 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
 
+function createRequestId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function CycleForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clientRequestId, setClientRequestId] = useState(createRequestId);
 
   async function submit(formData: FormData) {
     setLoading(true);
     setError(null);
-    const response = await fetch("/api/cycles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        readingDate: formData.get("readingDate"),
-        generatorCost: formData.get("generatorCost"),
-        notes: formData.get("notes")
-      })
-    });
-    const data = await response.json();
-    setLoading(false);
-    if (!response.ok) {
-      setError(data.error ?? "تعذر إنشاء الدورة");
-      return;
+    try {
+      const response = await fetch("/api/cycles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          readingDate: formData.get("readingDate"),
+          generatorCost: formData.get("generatorCost"),
+          notes: formData.get("notes"),
+          clientRequestId
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "تعذر إنشاء الدورة");
+        return;
+      }
+      setClientRequestId(createRequestId());
+      router.push(`/cycles/${data.cycle.id}/readings`);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر إنشاء الدورة، أعد المحاولة وسيتم استخدام نفس طلب الحفظ");
+    } finally {
+      setLoading(false);
     }
-    router.push(`/cycles/${data.cycle.id}/readings`);
-    router.refresh();
   }
 
   return (

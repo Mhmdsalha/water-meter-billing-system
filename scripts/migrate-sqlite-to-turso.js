@@ -57,9 +57,11 @@ async function createSchema() {
           total_discrepancy REAL,
           status TEXT DEFAULT 'open',
           notes TEXT,
+          client_request_id TEXT,
           created_at TEXT DEFAULT (datetime('now'))
         )`
       },
+      { sql: `CREATE UNIQUE INDEX IF NOT EXISTS billing_cycles_client_request_unique ON billing_cycles(client_request_id)` },
       {
         sql: `CREATE TABLE IF NOT EXISTS meter_readings (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,8 +123,8 @@ async function migrate() {
     })),
     ...cycles.map((row) => ({
       sql: `INSERT INTO billing_cycles
-        (id, week_start, week_end, generator_cost, total_cups, exact_price_per_cup, total_billed, total_discrepancy, status, notes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, week_start, week_end, generator_cost, total_cups, exact_price_per_cup, total_billed, total_discrepancy, status, notes, client_request_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         row.id,
         row.week_start,
@@ -134,6 +136,7 @@ async function migrate() {
         row.total_discrepancy,
         row.status,
         row.notes,
+        row.client_request_id,
         row.created_at
       ]
     })),
