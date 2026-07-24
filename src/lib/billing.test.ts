@@ -8,6 +8,7 @@ const result = calculateBilling(201, [
 ]);
 
 assert.equal(result.totalCups, 20.4);
+assert.equal(result.exactPricePerCup, 9.85);
 assert.deepEqual(
   result.results.map((reading) => reading.billedAmount),
   [83, 74, 44]
@@ -35,10 +36,11 @@ const cycle34Result = calculateBilling(310.4, [
 
 assert.deepEqual(
   cycle34Result.results.map((reading) => reading.billedAmount),
-  [35, 27, 22, 35, 12, 34, 24, 41, 46, 35]
+  [35, 27, 21, 35, 12, 34, 24, 41, 46, 35]
 );
-assert.equal(cycle34Result.totalBilled, 311);
-assert.equal(cycle34Result.totalDiscrepancy, -0.6);
+assert.equal(cycle34Result.totalBilled, 310);
+assert.equal(cycle34Result.totalDiscrepancy, 0.4);
+assert.equal(cycle34Result.exactPricePerCup, 11.58);
 
 const carriedBalanceResult = calculateBilling(318, [
   { apartmentId: 1, apartmentNumber: "1", previousReading: 910.5, currentReading: 914, fractionFromPrev: -0.9 },
@@ -57,7 +59,7 @@ const ammar = carriedBalanceResult.results.find((reading) => reading.apartmentNu
 const borrowedApartment = carriedBalanceResult.results.find((reading) => reading.roundingAdjustment === 1);
 assert.equal(carriedBalanceResult.totalBilled, 318);
 assert.equal(carriedBalanceResult.totalDiscrepancy, 0);
-assert.equal(ammar?.rawAmount.toFixed(4), "23.8927");
+assert.equal(ammar?.rawAmount.toFixed(4), "23.8850");
 assert.equal(ammar?.billedAmount, 25);
 assert.equal(borrowedApartment?.apartmentNumber, "7");
 assert.equal(borrowedApartment?.fractionCarried < -1, true);

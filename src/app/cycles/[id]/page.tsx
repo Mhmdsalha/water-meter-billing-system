@@ -37,7 +37,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard label="تكلفة المولد" value={`₪ ${formatMoney(detail.cycle.generatorCost)}`} />
           <MetricCard label="إجمالي الأكواب" value={formatCups(detail.cycle.totalCups, 2)} />
-          <MetricCard label="سعر الكوب" value={`₪ ${formatMoney(detail.cycle.exactPricePerCup, 4)}`} />
+          <MetricCard label="سعر الكوب" value={`₪ ${formatMoney(detail.cycle.exactPricePerCup, 2)}`} />
           <MetricCard label="المستحق" value={`₪ ${formatMoney(detail.cycle.totalBilled)}`} />
           <MetricCard
             label="تغطية المبلغ"

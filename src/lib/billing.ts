@@ -36,6 +36,10 @@ function naturalBill(rawAmount: number) {
   return Math.max(0, Math.ceil(rawAmount));
 }
 
+function roundPricePerCup(value: number) {
+  return parseFloat(value.toFixed(2));
+}
+
 function getBorrowCount(counts: BorrowCounts | undefined, apartmentId: number) {
   if (!counts) return 0;
   if (counts instanceof Map) return counts.get(apartmentId) ?? 0;
@@ -79,7 +83,7 @@ export function calculateBilling(
     throw new Error("إجمالي الأكواب صفر، تحقق من القراءات");
   }
 
-  const exactPricePerCup = generatorCost / totalCups;
+  const exactPricePerCup = roundPricePerCup(generatorCost / totalCups);
   const results = withConsumption.map((reading) => {
     const consumptionCost = reading.cupsConsumed * exactPricePerCup;
     const rawAmount = fixed(consumptionCost + reading.fractionFromPrev);
@@ -100,7 +104,8 @@ export function calculateBilling(
     };
   });
 
-  const targetTotal = Number.isInteger(generatorCost) ? generatorCost : Math.ceil(generatorCost);
+  // Residents pay whole shekels only. Any decimal remainder of the generator cost is intentionally not collected.
+  const targetTotal = Math.floor(generatorCost);
   let totalBilled = results.reduce((sum, reading) => sum + reading.billedAmount, 0);
   const shortage = targetTotal - totalBilled;
 

@@ -322,7 +322,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             </div>
             <div class="summary-item">
               <div class="summary-label">سعر الكوب</div>
-              <div class="summary-value">${currency(cycle.exactPricePerCup, 4)}</div>
+              <div class="summary-value">${currency(cycle.exactPricePerCup, 2)}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">تغطية المبلغ</div>

@@ -108,7 +108,7 @@ export function CycleReport({ cycle, readings }: { cycle: CycleRow; readings: Re
         <View style={styles.summary}>
           <Text>تكلفة المولد: ₪ {formatMoney(cycle.generatorCost)}</Text>
           <Text>إجمالي الأكواب: {formatCups(cycle.totalCups, 2)} كوب</Text>
-          <Text>سعر الكوب: ₪ {formatMoney(cycle.exactPricePerCup, 4)}</Text>
+          <Text>سعر الكوب: ₪ {formatMoney(cycle.exactPricePerCup, 2)}</Text>
           <Text>تغطية المبلغ: {coverage}</Text>
         </View>
 

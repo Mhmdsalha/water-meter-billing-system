@@ -67,7 +67,7 @@ export default async function DashboardPage() {
           ["الشقق الفعالة", data.apartmentsCount],
           ["الشقق المقروءة", readCount],
           ["إجمالي الأكواب", formatCups(cycle?.totalCups, 2)],
-          ["سعر الكوب", cycle?.exactPricePerCup ? `₪ ${formatMoney(cycle.exactPricePerCup, 4)}` : "بانتظار الإغلاق"]
+          ["سعر الكوب", cycle?.exactPricePerCup ? `₪ ${formatMoney(cycle.exactPricePerCup, 2)}` : "بانتظار الإغلاق"]
         ].map(([label, value]) => (
           <Card key={label} className="p-4">
             <MetricCard label={label} value={value} icon={Gauge} className="border-0 bg-transparent p-0" valueClassName="text-2xl" />
