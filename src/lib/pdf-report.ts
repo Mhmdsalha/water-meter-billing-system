@@ -126,7 +126,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
 
           @page {
             size: A4 landscape;
-            margin: 6mm;
+            margin: 4mm;
           }
 
           * {
@@ -139,65 +139,64 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             color: #111827;
             background: #ffffff;
             font-family: "ReportArabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
-            font-size: 11px;
-            line-height: 1.55;
+            font-size: 12px;
+            line-height: 1.45;
           }
 
           .page {
             width: 100%;
-            padding: 0 2px;
           }
 
           .header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 18px;
-            margin-bottom: 8px;
-            padding-bottom: 8px;
+            gap: 20px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
             border-bottom: 2px solid #111827;
           }
 
           h1 {
             margin: 0 0 6px;
-            font-size: 22px;
+            font-size: 25px;
             font-weight: 700;
             line-height: 1.25;
           }
 
           .subtitle {
             color: #475569;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
           }
 
           .meta {
-            min-width: 190px;
+            min-width: 210px;
             text-align: left;
             direction: rtl;
             color: #334155;
-            font-size: 10px;
+            font-size: 11px;
           }
 
           .summary {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-bottom: 8px;
+            gap: 8px;
+            margin-bottom: 10px;
           }
 
           .summary-item {
-            min-height: 48px;
+            min-height: 60px;
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 6px 8px;
+            padding: 8px 10px;
             background: #f8fafc;
           }
 
           .summary-label {
-            margin-bottom: 4px;
+            margin-bottom: 5px;
             color: #64748b;
-            font-size: 9.5px;
+            font-size: 10.5px;
             font-weight: 600;
           }
 
@@ -205,7 +204,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             direction: ltr;
             text-align: right;
             color: #0f172a;
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 700;
             white-space: nowrap;
           }
@@ -218,12 +217,12 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             border: 1px solid #94a3b8;
           }
 
-          col.apartment { width: 8%; }
-          col.owner { width: 26%; }
+          col.apartment { width: 9%; }
+          col.owner { width: 27%; }
           col.previous { width: 13%; }
           col.current { width: 13%; }
-          col.cups { width: 14%; }
-          col.fraction { width: 17%; }
+          col.cups { width: 13%; }
+          col.fraction { width: 16%; }
           col.due { width: 9%; }
 
           thead {
@@ -236,11 +235,11 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
           }
 
           th {
-            padding: 9px 9px;
+            padding: 11px 10px;
             border: 1px solid #94a3b8;
             background: #e2e8f0;
             color: #0f172a;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 700;
             line-height: 1.35;
             text-align: center;
@@ -249,13 +248,13 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
           }
 
           td {
-            height: 34px;
-            padding: 8px 9px;
+            height: 48px;
+            padding: 10px;
             border: 1px solid #cbd5e1;
             color: #1f2937;
             vertical-align: middle;
             background: #ffffff;
-            font-size: 11px;
+            font-size: 13px;
           }
 
           tbody tr:nth-child(even) td {
@@ -266,6 +265,7 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             text-align: right;
             font-weight: 600;
             overflow-wrap: anywhere;
+            font-size: 13.5px;
           }
 
           .num {
@@ -284,16 +284,16 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
           .footer {
             display: flex;
             justify-content: space-between;
-            margin-top: 6px;
+            margin-top: 8px;
             color: #64748b;
-            font-size: 9px;
+            font-size: 10px;
           }
 
           .signature {
-            margin-top: 3px;
+            margin-top: 4px;
             direction: ltr;
             color: #94a3b8;
-            font-size: 8px;
+            font-size: 9px;
             text-align: center;
           }
         </style>
@@ -382,10 +382,10 @@ export async function generateCycleReportPdf(cycle: CycleRow, readings: ReadingR
       landscape: true,
       printBackground: true,
       margin: {
-        top: "6mm",
-        right: "6mm",
-        bottom: "6mm",
-        left: "6mm"
+        top: "4mm",
+        right: "4mm",
+        bottom: "4mm",
+        left: "4mm"
       }
     });
 

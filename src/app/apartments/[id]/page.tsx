@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
+import { MeterResetButton } from "@/components/MeterResetButton";
 import { getApartmentHistory } from "@/lib/db/queries";
 import { formatCups, formatMoney } from "@/lib/format";
 import { notFound } from "next/navigation";
@@ -37,7 +38,25 @@ export default async function ApartmentDetailPage({ params }: { params: { id: st
             <p className="number mt-1 font-semibold">{history.readings.length}</p>
           </div>
         </div>
+        <div className="mt-4 border-t border-border pt-4">
+          <MeterResetButton apartmentId={history.apartment.id} />
+        </div>
       </Card>
+
+      {history.adjustments.length > 0 ? (
+        <Card className="p-4 shadow-none">
+          <p className="text-sm font-bold">سجل تغييرات العدادات</p>
+          <div className="mt-3 space-y-2">
+            {history.adjustments.map((adjustment) => (
+              <div key={adjustment.id} className="grid gap-2 border-b border-border/70 pb-2 last:border-0 sm:grid-cols-[auto_auto_1fr] sm:items-center">
+                <p className="number text-sm text-text-muted">{adjustment.createdAt ?? "-"}</p>
+                <p className="number font-bold">{formatCups(adjustment.baselineReading, 4)}</p>
+                <p className="text-sm text-text-muted">{adjustment.notes ?? "تم ضبط قراءة بداية العداد"}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <Card>
         <TableWrap>

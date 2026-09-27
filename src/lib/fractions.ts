@@ -13,13 +13,14 @@ export interface NewCycleReadingSeed {
 
 export function seedReadingsForNewCycle(
   apartmentIds: number[],
-  previousSnapshots: PreviousReadingSnapshot[]
+  previousSnapshots: PreviousReadingSnapshot[],
+  baselineOverrides: Map<number, number> = new Map()
 ): NewCycleReadingSeed[] {
   const previousByApartment = new Map(previousSnapshots.map((snapshot) => [snapshot.apartmentId, snapshot]));
 
   return apartmentIds.map((apartmentId) => {
     const previous = previousByApartment.get(apartmentId);
-    const previousReading = Number(previous?.currentReading ?? 0);
+    const previousReading = baselineOverrides.get(apartmentId) ?? Number(previous?.currentReading ?? 0);
     const fractionFromPrev = Number(previous?.fractionCarried ?? 0);
 
     return {

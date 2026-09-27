@@ -60,7 +60,18 @@ export const payments = sqliteTable("payments", {
   collectedBy: text("collected_by")
 });
 
+export const meterAdjustments = sqliteTable("meter_adjustments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  apartmentId: integer("apartment_id").notNull().references(() => apartments.id),
+  appliedCycleId: integer("applied_cycle_id").references(() => billingCycles.id),
+  previousLastReading: real("previous_last_reading"),
+  baselineReading: real("baseline_reading").notNull(),
+  notes: text("notes"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`)
+});
+
 export type Apartment = typeof apartments.$inferSelect;
 export type BillingCycle = typeof billingCycles.$inferSelect;
 export type MeterReading = typeof meterReadings.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type MeterAdjustment = typeof meterAdjustments.$inferSelect;

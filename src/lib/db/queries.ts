@@ -52,6 +52,16 @@ export interface ReadingRow {
   canEditPrevious?: boolean;
 }
 
+export interface MeterAdjustmentRow {
+  id: number;
+  apartmentId: number;
+  appliedCycleId: number | null;
+  previousLastReading: number | null;
+  baselineReading: number;
+  notes: string | null;
+  createdAt: string | null;
+}
+
 function bool(value: unknown) {
   return Boolean(Number(value ?? 0));
 }
@@ -109,6 +119,18 @@ function normalizeReading(row: Record<string, unknown>): ReadingRow {
     isPaid: row.isPaid == null ? null : bool(row.isPaid),
     // A previous reading can need correction after a meter replacement, even in an archived cycle.
     canEditPrevious: true
+  };
+}
+
+function normalizeMeterAdjustment(row: Record<string, unknown>): MeterAdjustmentRow {
+  return {
+    id: Number(row.id),
+    apartmentId: Number(row.apartmentId),
+    appliedCycleId: row.appliedCycleId == null ? null : Number(row.appliedCycleId),
+    previousLastReading: row.previousLastReading == null ? null : Number(row.previousLastReading),
+    baselineReading: Number(row.baselineReading),
+    notes: row.notes == null ? null : String(row.notes),
+    createdAt: row.createdAt == null ? null : String(row.createdAt)
   };
 }
 
@@ -188,6 +210,16 @@ export async function getApartmentHistory(id: number) {
     [id]
   );
 
+  const adjustments = await allRows(
+    `SELECT id, apartment_id as apartmentId, applied_cycle_id as appliedCycleId,
+      previous_last_reading as previousLastReading, baseline_reading as baselineReading,
+      notes, created_at as createdAt
+     FROM meter_adjustments
+     WHERE apartment_id = ?
+     ORDER BY id DESC`,
+    [id]
+  );
+
   return {
     apartment,
     readings: rows.map((row) => ({
@@ -195,7 +227,8 @@ export async function getApartmentHistory(id: number) {
       weekStart: String(row.weekStart),
       weekEnd: String(row.weekEnd),
       cycleStatus: row.cycleStatus === "finalized" ? "finalized" : "open"
-    }))
+    })),
+    adjustments: adjustments.map(normalizeMeterAdjustment)
   };
 }
 
@@ -332,9 +365,25 @@ export async function createCycle(input: {
      ) latest ON latest.apartment_id = mr.apartment_id AND latest.maxCycleId = mr.cycle_id`
   )) as { apartmentId: number; currentReading: number | null; fractionCarried: number | null }[];
 
+  const pendingAdjustments = await allRows(
+    `SELECT id, apartment_id as apartmentId, baseline_reading as baselineReading
+     FROM meter_adjustments
+     WHERE applied_cycle_id IS NULL
+       AND apartment_id IN (${apartments.map(() => "?").join(",") || "NULL"})
+     ORDER BY id ASC`,
+    apartments.map((apartment) => apartment.id)
+  );
+  const baselineOverrides = new Map<number, number>();
+  const adjustmentIds: number[] = [];
+  for (const adjustment of pendingAdjustments) {
+    baselineOverrides.set(Number(adjustment.apartmentId), Number(adjustment.baselineReading));
+    adjustmentIds.push(Number(adjustment.id));
+  }
+
   const seeds = seedReadingsForNewCycle(
     apartments.map((apartment) => apartment.id),
-    snapshots
+    snapshots,
+    baselineOverrides
   );
 
   await batchSql(
@@ -347,7 +396,68 @@ export async function createCycle(input: {
     "write"
   );
 
+  if (adjustmentIds.length > 0) {
+    await runSql(
+      `UPDATE meter_adjustments SET applied_cycle_id = ? WHERE id IN (${adjustmentIds.map(() => "?").join(",")})`,
+      [cycleId, ...adjustmentIds]
+    );
+  }
+
   return getCycleDetail(cycleId);
+}
+
+export async function replaceApartmentMeter(
+  apartmentId: number,
+  input: { baselineReading: number | string; notes?: string | null }
+) {
+  const apartment = await getApartment(apartmentId);
+  if (!apartment) throw new Error("الشقة غير موجودة");
+
+  const baselineReading = parseReadingValue(input.baselineReading, "قراءة بداية العداد الجديد");
+  const latestReading = await getRow(
+    `SELECT current_reading as currentReading
+     FROM meter_readings
+     WHERE apartment_id = ?
+     ORDER BY cycle_id DESC, id DESC
+     LIMIT 1`,
+    [apartmentId]
+  );
+  const openCycle = await getLatestOpenCycle();
+  const adjustmentResult = await runSql(
+    `INSERT INTO meter_adjustments
+      (apartment_id, previous_last_reading, baseline_reading, notes)
+     VALUES (?, ?, ?, ?)`,
+    [apartmentId, latestReading?.currentReading == null ? null : Number(latestReading.currentReading), baselineReading, input.notes?.trim() || null]
+  );
+  const adjustmentId = insertedId(adjustmentResult);
+
+  if (!openCycle) {
+    return { apartment, effective: "next-cycle" as const, adjustmentId };
+  }
+
+  const openReading = await getRow<{ id: number }>(
+    "SELECT id FROM meter_readings WHERE cycle_id = ? AND apartment_id = ?",
+    [openCycle.id, apartmentId]
+  );
+  if (!openReading) throw new Error("لا توجد قراءة للشقة في الدورة المفتوحة");
+
+  const resetNote = [input.notes?.trim(), "تم تغيير العداد وضبط قراءة البداية"].filter(Boolean).join(" - ");
+  await batchSql(
+    [
+      {
+        sql: `UPDATE meter_readings
+          SET previous_reading = ?, current_reading = ?, cups_consumed = 0,
+              consumption_cost = NULL, raw_amount = NULL, billed_amount = NULL,
+              fraction_carried = NULL, is_read = 0, read_at = NULL, notes = ?
+          WHERE id = ?`,
+        args: [baselineReading, baselineReading, resetNote, Number(openReading.id)]
+      },
+      { sql: "UPDATE meter_adjustments SET applied_cycle_id = ? WHERE id = ?", args: [openCycle.id, adjustmentId] }
+    ],
+    "write"
+  );
+
+  return { apartment, effective: "open-cycle" as const, cycleId: openCycle.id, adjustmentId };
 }
 
 export async function updateCycleGeneratorCost(id: number, generatorCost: number) {

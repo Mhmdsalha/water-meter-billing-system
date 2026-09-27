@@ -70,6 +70,17 @@ export async function initDb(client: Client = sqlite) {
           paid_at TEXT,
           collected_by TEXT
         )`
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS meter_adjustments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          apartment_id INTEGER NOT NULL REFERENCES apartments(id),
+          applied_cycle_id INTEGER REFERENCES billing_cycles(id),
+          previous_last_reading REAL,
+          baseline_reading REAL NOT NULL,
+          notes TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )`
       }
     ],
     "write"
