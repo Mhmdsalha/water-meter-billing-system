@@ -66,6 +66,7 @@ export const meterAdjustments = sqliteTable("meter_adjustments", {
   appliedCycleId: integer("applied_cycle_id").references(() => billingCycles.id),
   previousLastReading: real("previous_last_reading"),
   baselineReading: real("baseline_reading").notNull(),
+  isApplied: integer("is_applied", { mode: "boolean" }).default(false),
   notes: text("notes"),
   createdAt: text("created_at").default(sql`(datetime('now'))`)
 });

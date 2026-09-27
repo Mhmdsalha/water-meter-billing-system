@@ -369,7 +369,7 @@ export async function createCycle(input: {
   const pendingAdjustments = await allRows(
     `SELECT id, apartment_id as apartmentId, baseline_reading as baselineReading
      FROM meter_adjustments
-     WHERE applied_cycle_id IS NULL
+     WHERE COALESCE(is_applied, 0) = 0
        AND apartment_id IN (${apartments.map(() => "?").join(",") || "NULL"})
      ORDER BY id ASC`,
     apartments.map((apartment) => apartment.id)
@@ -399,7 +399,7 @@ export async function createCycle(input: {
 
   if (adjustmentIds.length > 0) {
     await runSql(
-      `UPDATE meter_adjustments SET applied_cycle_id = ? WHERE id IN (${adjustmentIds.map(() => "?").join(",")})`,
+      `UPDATE meter_adjustments SET applied_cycle_id = ?, is_applied = 1 WHERE id IN (${adjustmentIds.map(() => "?").join(",")})`,
       [cycleId, ...adjustmentIds]
     );
   }
@@ -453,7 +453,7 @@ export async function replaceApartmentMeter(
           WHERE id = ?`,
         args: [baselineReading, baselineReading, resetNote, Number(openReading.id)]
       },
-      { sql: "UPDATE meter_adjustments SET applied_cycle_id = ? WHERE id = ?", args: [openCycle.id, adjustmentId] }
+      { sql: "UPDATE meter_adjustments SET applied_cycle_id = ?, is_applied = 1 WHERE id = ?", args: [openCycle.id, adjustmentId] }
     ],
     "write"
   );
@@ -612,6 +612,8 @@ export async function deleteCycle(id: number) {
 
   await batchSql(
     [
+      // Keep the meter-change audit entry, but release its foreign-key link before deleting the cycle.
+      { sql: "UPDATE meter_adjustments SET applied_cycle_id = NULL WHERE applied_cycle_id = ?", args: [id] },
       { sql: "DELETE FROM payments WHERE cycle_id = ?", args: [id] },
       { sql: "DELETE FROM meter_readings WHERE cycle_id = ?", args: [id] },
       { sql: "DELETE FROM billing_cycles WHERE id = ?", args: [id] }

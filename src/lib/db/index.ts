@@ -78,6 +78,7 @@ export async function initDb(client: Client = sqlite) {
           applied_cycle_id INTEGER REFERENCES billing_cycles(id),
           previous_last_reading REAL,
           baseline_reading REAL NOT NULL,
+          is_applied INTEGER DEFAULT 0,
           notes TEXT,
           created_at TEXT DEFAULT (datetime('now'))
         )`
@@ -93,6 +94,17 @@ export async function initDb(client: Client = sqlite) {
       throw error;
     }
   }
+
+  try {
+    await client.execute("ALTER TABLE meter_adjustments ADD COLUMN is_applied INTEGER DEFAULT 0");
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.toLowerCase().includes("duplicate")) {
+      throw error;
+    }
+  }
+
+  // Mark historic adjustments as applied before a linked cycle can be removed.
+  await client.execute("UPDATE meter_adjustments SET is_applied = 1 WHERE applied_cycle_id IS NOT NULL");
 
   await client.execute("CREATE UNIQUE INDEX IF NOT EXISTS billing_cycles_client_request_unique ON billing_cycles(client_request_id)");
 }
