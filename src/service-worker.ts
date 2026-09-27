@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "water-billing-v3";
+const CACHE_NAME = "water-billing-v4";
 const APP_SHELL = ["/", "/field", "/manifest.json"];
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -30,6 +30,13 @@ sw.addEventListener("fetch", (event: FetchEvent) => {
   const url = new URL(request.url);
 
   if (url.pathname.startsWith("/api/pdf")) return;
+
+  // Server component requests contain live apartment and cycle data. Keeping these
+  // responses out of the cache lets an activation change appear immediately.
+  if (request.headers.get("RSC") === "1" || url.searchParams.has("_rsc")) {
+    event.respondWith(fetch(request).catch(async () => (await caches.match(request)) ?? offlineFallback()));
+    return;
+  }
 
   if (request.mode === "navigate" || url.pathname === "/field") {
     event.respondWith(

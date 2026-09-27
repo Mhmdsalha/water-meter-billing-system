@@ -27,15 +27,17 @@ export function AppNav() {
           );
         })}
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link key={href} href={href} title={label} aria-label={label} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition", active ? "bg-accent/15 text-accent" : "text-text-muted hover:bg-surface-strong hover:text-text-primary")}>
-              <Icon className="h-5 w-5" />{label}
-            </Link>
-          );
-        })}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface/95 backdrop-blur-xl lg:hidden">
+        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+          {items.map(({ href, label, icon: Icon }) => {
+            const active = href === "/" ? pathname === href : pathname.startsWith(href);
+            return (
+              <Link key={href} href={href} title={label} aria-label={label} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition", active ? "bg-accent/15 text-accent" : "text-text-muted hover:bg-surface-strong hover:text-text-primary")}>
+                <Icon className="h-5 w-5" />{label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

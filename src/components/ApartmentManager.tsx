@@ -17,6 +17,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
   const [editingApartment, setEditingApartment] = useState<ApartmentRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   function sortApartments(items: ApartmentRow[]) {
     return [...items].sort((a, b) => Number(a.number) - Number(b.number) || a.number.localeCompare(b.number, "ar"));
@@ -54,21 +55,29 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
   }
 
   async function toggle(apartment: ApartmentRow) {
-    const response = await fetch(`/api/apartments/${apartment.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !apartment.isActive })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setError(data.error ?? "تعذر تحديث حالة الشقة");
-      return;
+    setTogglingId(apartment.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/apartments/${apartment.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !apartment.isActive })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "تعذر تحديث حالة الشقة");
+        return;
+      }
+      setApartments((current) => current.map((item) => (item.id === apartment.id ? data.apartment : item)));
+      if (editingApartment?.id === apartment.id) {
+        setEditingApartment(data.apartment);
+      }
+      router.refresh();
+    } catch {
+      setError("تعذر تحديث حالة الشقة. حاول مرة أخرى.");
+    } finally {
+      setTogglingId(null);
     }
-    setApartments((current) => current.map((item) => (item.id === apartment.id ? data.apartment : item)));
-    if (editingApartment?.id === apartment.id) {
-      setEditingApartment(data.apartment);
-    }
-    router.refresh();
   }
 
   return (
@@ -179,7 +188,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
                   <Edit3 className="h-4 w-4" />
                   تعديل
                 </Button>
-                <Button type="button" size="sm" variant="secondary" className="min-h-11" onClick={() => toggle(apartment)}>
+                <Button type="button" size="sm" variant="secondary" className="min-h-11" onClick={() => toggle(apartment)} disabled={togglingId === apartment.id}>
                   <Power className="h-4 w-4" />
                   {apartment.isActive ? "تعطيل" : "تفعيل"}
                 </Button>
@@ -229,7 +238,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
                         <Edit3 className="h-4 w-4" />
                         تعديل
                       </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => toggle(apartment)}>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => toggle(apartment)} disabled={togglingId === apartment.id}>
                         <Power className="h-4 w-4" />
                         {apartment.isActive ? "تعطيل" : "تفعيل"}
                       </Button>

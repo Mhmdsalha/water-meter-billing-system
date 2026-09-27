@@ -63,7 +63,7 @@ export interface MeterAdjustmentRow {
 }
 
 function bool(value: unknown) {
-  return Boolean(Number(value ?? 0));
+  return value === true || value === 1 || value === "1" || value === "true";
 }
 
 function normalizeApartment(row: Record<string, unknown>): ApartmentRow {
@@ -164,12 +164,13 @@ export async function updateApartment(
 ) {
   const current = await getApartment(id);
   if (!current) throw new Error("الشقة غير موجودة");
+  const isActive = input.isActive === undefined ? current.isActive : Boolean(input.isActive);
 
   await runSql("UPDATE apartments SET number = ?, floor = ?, owner_name = ?, is_active = ? WHERE id = ?", [
     input.number?.trim() || current.number,
     input.floor === undefined ? current.floor : input.floor,
     input.ownerName === undefined ? current.ownerName : input.ownerName?.trim() || null,
-    input.isActive === undefined ? Number(current.isActive) : Number(input.isActive),
+    Number(isActive),
     id
   ]);
 

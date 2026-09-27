@@ -23,7 +23,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0b1220",
   width: "device-width",
-  initialScale: 1
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <AppNav />
             </div>
           </header>
-          <main className="flex-1 pb-24 lg:pb-10">{children}</main>
+          <main className="flex-1 pb-28 lg:pb-10">{children}</main>
           </div>
         </div>
       </body>

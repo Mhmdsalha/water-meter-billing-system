@@ -273,10 +273,12 @@ function buildReportHtml(cycle: CycleRow, readings: ReadingRow[]) {
             unicode-bidi: isolate;
             text-align: center;
             font-variant-numeric: tabular-nums;
+            font-size: 15.5px;
             white-space: nowrap;
           }
 
           .due {
+            font-size: 16px;
             font-weight: 700;
             color: #0f172a;
           }

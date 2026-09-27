@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { WaterProgress } from "@/components/WaterProgress";
 import { getDashboardData } from "@/lib/db/queries";
 import { formatCups, formatMoney } from "@/lib/format";
-import { ArrowLeft, CalendarPlus, CheckCircle2, ClipboardList, FileText, Gauge, Layers3, WalletCards } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarPlus, ChevronLeft, ClipboardList, FileText, Gauge, Layers3, WalletCards } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
         <Card className="p-4 shadow-none"><div className="flex items-start justify-between"><div><p className="text-sm text-text-muted">مستحقات آخر دورة</p><p className="number mt-2 text-3xl font-bold">₪ {formatMoney(totalDue, 0)}</p></div><WalletCards className="h-6 w-6 text-accent" /></div></Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
+      <section>
         <Card className="p-5 shadow-none">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -65,31 +65,34 @@ export default async function DashboardPage() {
             <ActionLink href={cycle ? `/cycles/${cycle.id}/report` : "#"} label="تنزيل التقرير" icon={FileText} disabled={!cycle || hasOpenCycle} />
           </div>
         </Card>
-
-        <Card className="p-5 shadow-none">
-          <h2 className="text-lg font-bold">خطوات الدورة</h2>
-          <ol className="mt-5 space-y-4">
-            <li className="flex gap-3"><span className="number flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-sm font-bold text-accent">1</span><div><p className="font-bold">إنشاء الدورة</p><p className="text-sm text-text-muted">التاريخ والتكلفة فقط.</p></div></li>
-            <li className="flex gap-3"><span className="number flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-sm font-bold text-accent">2</span><div><p className="font-bold">حفظ القراءات</p><p className="text-sm text-text-muted">على الجهاز أو عبر الإنترنت.</p></div></li>
-            <li className="flex gap-3"><span className="number flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-success/15 text-sm font-bold text-success">3</span><div><p className="font-bold">اعتماد وتنزيل</p><p className="text-sm text-text-muted">تُحسب الفاتورة ويصبح التقرير جاهزاً.</p></div></li>
-          </ol>
-        </Card>
       </section>
 
       <section className="border-t border-border pt-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div><h2 className="text-lg font-bold">آخر الدورات</h2><p className="mt-1 text-sm text-text-muted">الأرشيف محفوظ ويمكن فتح أي دورة وتعديلها.</p></div>
-          <Link href="/cycles" className="inline-flex items-center gap-1 text-sm font-bold text-accent">كل الدورات <ArrowLeft className="h-4 w-4" /></Link>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-accent/25 bg-accent/10 text-accent"><CalendarDays className="h-5 w-5" /></span>
+            <div><h2 className="text-lg font-bold">آخر الدورات</h2><p className="mt-1 text-sm text-text-muted">الأرشيف محفوظ والتفاصيل متاحة في أي وقت.</p></div>
+          </div>
+          <Link href="/cycles" className="shrink-0 inline-flex items-center gap-1 text-sm font-bold text-accent">كل الدورات <ArrowLeft className="h-4 w-4" /></Link>
         </div>
-        <div className="grid gap-2">
-          {data.cycles.map((item) => (
-            <Link key={item.id} href={`/cycles/${item.id}`} className="grid min-h-16 grid-cols-[1fr_auto_auto] items-center gap-3 border-b border-border/70 px-1 py-3 transition hover:bg-surface">
-              <div><p className="number font-bold">{item.weekStart}</p><p className="text-xs text-text-muted">{item.status === "finalized" ? "دورة معتمدة" : "دورة مفتوحة"}</p></div>
-              <p className="number text-sm font-bold">₪ {formatMoney(item.totalBilled, 0)}</p>
-              <CheckCircle2 className={item.status === "finalized" ? "h-5 w-5 text-success" : "h-5 w-5 text-warning"} />
+        <Card className="overflow-hidden p-0 shadow-none">
+          {data.cycles.length === 0 ? <p className="p-6 text-center text-sm text-text-muted">لا توجد دورات مسجلة بعد.</p> : data.cycles.map((item) => (
+            <Link key={item.id} href={`/cycles/${item.id}`} className="group grid gap-4 border-b border-border/70 px-4 py-4 transition last:border-0 hover:bg-surface-strong/60 sm:grid-cols-[1.3fr_auto_auto_auto] sm:items-center sm:gap-6">
+              <div className="flex items-center gap-3">
+                <span className="number flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-sm font-bold text-text-primary">{item.id}</span>
+                <div><p className="text-xs text-text-muted">رقم الدورة</p><p className="number mt-1 text-base font-bold">{item.weekStart}</p></div>
+              </div>
+              <div className="grid grid-cols-2 gap-5 border-y border-border/70 py-3 sm:contents sm:border-0 sm:p-0">
+                <div><p className="text-xs text-text-muted">التكلفة</p><p className="number mt-1 font-bold">₪ {formatMoney(item.generatorCost, 0)}</p></div>
+                <div><p className="text-xs text-text-muted">الاستهلاك</p><p className="number mt-1 font-bold">{formatCups(item.totalCups, 2)}</p></div>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
+                <Badge variant={item.status === "finalized" ? "success" : "warning"}>{item.status === "finalized" ? "معتمدة" : "مفتوحة"}</Badge>
+                <ChevronLeft className="h-5 w-5 text-text-muted transition group-hover:-translate-x-1 group-hover:text-accent" />
+              </div>
             </Link>
           ))}
-        </div>
+        </Card>
       </section>
     </div>
   );
