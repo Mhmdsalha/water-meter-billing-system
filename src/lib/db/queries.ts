@@ -107,7 +107,8 @@ function normalizeReading(row: Record<string, unknown>): ReadingRow {
     notes: row.notes == null ? null : String(row.notes),
     amountPaid: row.amountPaid == null ? null : Number(row.amountPaid),
     isPaid: row.isPaid == null ? null : bool(row.isPaid),
-    canEditPrevious: row.otherReadingsCount == null ? undefined : Number(row.otherReadingsCount) === 0
+    // A previous reading can need correction after a meter replacement, even in an archived cycle.
+    canEditPrevious: true
   };
 }
 
@@ -511,29 +512,18 @@ export async function deleteCycle(id: number) {
   return { deleted: true, id };
 }
 
-async function canEditPreviousReading(cycleId: number, apartmentId: number) {
-  const row = await getRow<{ count: number }>(
-    `SELECT COUNT(*) as count
-     FROM meter_readings
-     WHERE apartment_id = ? AND cycle_id <> ?`,
-    [apartmentId, cycleId]
-  );
-
-  return Number(row?.count ?? 0) === 0;
-}
-
 export async function updateReading(
   id: number,
   input: { currentReading: number | string; previousReading?: number | string | null; notes?: string | null }
 ) {
   const row = (await getRow(
     `SELECT mr.id, mr.previous_reading as previousReading, mr.apartment_id as apartmentId,
-      mr.cycle_id as cycleId, bc.status
+      mr.cycle_id as cycleId, bc.status, bc.week_start as weekStart
      FROM meter_readings mr
      JOIN billing_cycles bc ON bc.id = mr.cycle_id
      WHERE mr.id = ?`,
     [id]
-  )) as { id: number; previousReading: number; apartmentId: number; cycleId: number; status: string } | undefined;
+  )) as { id: number; previousReading: number; apartmentId: number; cycleId: number; status: string; weekStart: string } | undefined;
 
   if (!row) throw new Error("القراءة غير موجودة");
 
@@ -541,10 +531,6 @@ export async function updateReading(
     input.previousReading === undefined || input.previousReading === null || input.previousReading === ""
       ? Number(row.previousReading)
       : parseReadingValue(input.previousReading, "القراءة السابقة");
-
-  if (previousReading !== Number(row.previousReading) && !(await canEditPreviousReading(Number(row.cycleId), Number(row.apartmentId)))) {
-    throw new Error("يمكن تعديل القراءة السابقة فقط عند أول قراءة للشقة");
-  }
 
   const currentReading = parseReadingValue(input.currentReading, "القراءة الحالية");
   assertCurrentReading(previousReading, currentReading);
@@ -558,7 +544,9 @@ export async function updateReading(
   );
 
   if (row.status === "finalized") {
-    return finalizeCycle(Number(row.cycleId));
+    await finalizeCycle(Number(row.cycleId));
+    await recalculateCyclesAfter(String(row.weekStart), Number(row.cycleId));
+    return getCycleDetail(Number(row.cycleId));
   }
 
   return getCycleDetail(Number(row.cycleId));

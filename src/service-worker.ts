@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "water-billing-v2";
+const CACHE_NAME = "water-billing-v3";
 const APP_SHELL = ["/", "/field", "/manifest.json"];
 const sw = self as unknown as ServiceWorkerGlobalScope;
 

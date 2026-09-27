@@ -1,6 +1,6 @@
 export function formatMoney(value: number | null | undefined, digits = 2) {
   const amount = Number(value ?? 0);
-  return amount.toLocaleString("ar-SA", {
+  return amount.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
   });

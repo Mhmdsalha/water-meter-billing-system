@@ -2,6 +2,21 @@
 
 import { offlineDb, type OfflineReading } from "./dexie";
 
+export async function saveCycleDraft(cycleId: number, status?: "saved" | "pending" | "synced" | "error") {
+  const readings = await offlineDb.readings.where("cycleId").equals(cycleId).toArray();
+  const pendingCount = readings.filter((reading) => reading.syncStatus === "pending" || reading.syncStatus === "error").length;
+  const nextStatus = status ?? (pendingCount > 0 ? "pending" : "saved");
+
+  await offlineDb.cycleDrafts.put({
+    cycleId,
+    status: nextStatus,
+    savedAt: new Date().toISOString(),
+    syncedAt: nextStatus === "synced" ? new Date().toISOString() : null,
+    readingsCount: readings.length,
+    pendingCount
+  });
+}
+
 export async function saveFieldPayload(readings: OfflineReading[]) {
   await offlineDb.transaction("rw", offlineDb.readings, async () => {
     const incomingKeys = new Set(readings.map((reading) => `${reading.cycleId}:${reading.apartmentId}`));
@@ -59,6 +74,7 @@ export async function markReading(
     readAt: new Date().toISOString(),
     syncStatus: "pending"
   });
+  await saveCycleDraft(reading.cycleId, "pending");
 }
 
 export async function syncPendingReadings() {
@@ -83,12 +99,14 @@ export async function syncPendingReadings() {
 
   if (!response.ok) {
     await offlineDb.readings.bulkUpdate(pending.map((reading) => ({ key: reading.id!, changes: { syncStatus: "error" } })));
+    await Promise.all([...new Set(pending.map((reading) => reading.cycleId))].map((cycleId) => saveCycleDraft(cycleId, "error")));
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error ?? "تعذرت المزامنة");
   }
 
   const data = await response.json();
   await offlineDb.readings.bulkUpdate(pending.map((reading) => ({ key: reading.id!, changes: { syncStatus: "synced" } })));
+  await Promise.all([...new Set(pending.map((reading) => reading.cycleId))].map((cycleId) => saveCycleDraft(cycleId, "synced")));
   return {
     synced: pending.length,
     finalizedCycles: data.finalizedCycles ?? [],

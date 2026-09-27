@@ -1,4 +1,4 @@
-const CACHE_NAME = "water-billing-v2";
+const CACHE_NAME = "water-billing-v3";
 const APP_SHELL = ["/", "/field", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

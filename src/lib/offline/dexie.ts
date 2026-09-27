@@ -19,10 +19,25 @@ export interface OfflineReading {
   notes: string | null;
 }
 
+export interface OfflineCycleDraft {
+  cycleId: number;
+  status: "saved" | "pending" | "synced" | "error";
+  savedAt: string;
+  syncedAt: string | null;
+  readingsCount: number;
+  pendingCount: number;
+}
+
 export const offlineDb = new Dexie("WaterBillingDB") as Dexie & {
   readings: EntityTable<OfflineReading, "id">;
+  cycleDrafts: EntityTable<OfflineCycleDraft, "cycleId">;
 };
 
 offlineDb.version(1).stores({
   readings: "++id, cycleId, apartmentId, syncStatus"
+});
+
+offlineDb.version(2).stores({
+  readings: "++id, cycleId, apartmentId, syncStatus",
+  cycleDrafts: "cycleId, status, savedAt"
 });

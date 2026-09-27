@@ -6,25 +6,34 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Input } from "@/components/ui/input";
 import { WaterProgress } from "@/components/WaterProgress";
 import { formatCups } from "@/lib/format";
-import { offlineDb, type OfflineReading } from "@/lib/offline/dexie";
-import { markReading, saveFieldPayload, syncPendingReadings } from "@/lib/offline/sync";
+import { offlineDb, type OfflineCycleDraft, type OfflineReading } from "@/lib/offline/dexie";
+import { markReading, saveCycleDraft, saveFieldPayload, syncPendingReadings } from "@/lib/offline/sync";
 import { useAppStore } from "@/store/useAppStore";
-import { CheckCircle, Copy, Download, FileText, RefreshCw, Save, Search, Smartphone } from "lucide-react";
+import { CheckCircle2, Cloud, CloudOff, Copy, Download, FileText, RefreshCw, Save, Search, ShieldCheck, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 function readingStatus(reading: OfflineReading) {
-  if (reading.syncStatus === "pending") return { label: "بانتظار المزامنة", variant: "warning" as const };
-  if (reading.syncStatus === "error") return { label: "خطأ", variant: "danger" as const };
-  if (reading.isRead) return { label: "مقروءة", variant: "success" as const };
-  return { label: "بانتظار", variant: "muted" as const };
+  if (reading.syncStatus === "error") return { label: "يحتاج مزامنة", variant: "danger" as const };
+  if (reading.syncStatus === "pending") return { label: "محفوظ محلياً", variant: "warning" as const };
+  if (reading.isRead) return { label: "متزامن", variant: "success" as const };
+  return { label: "بانتظار القراءة", variant: "muted" as const };
+}
+
+function draftStatus(draft: OfflineCycleDraft | null, pending: number) {
+  if (!draft) return "لم تحفظ أي قراءة محلياً بعد";
+  if (draft.status === "error") return "النسخة المحلية محفوظة وتنتظر إعادة المزامنة";
+  if (pending > 0) return `محفوظ على الجهاز - ${pending} بانتظار المزامنة`;
+  return "محفوظ ومتزامن";
 }
 
 export function FieldReader() {
-  const { isOnline, setIsOnline, pendingSyncCount, setPendingSyncCount } = useAppStore();
+  const { isOnline, setCurrentCycleId, setIsOnline, pendingSyncCount, setPendingSyncCount } = useAppStore();
   const [readings, setReadings] = useState<OfflineReading[]>([]);
   const [values, setValues] = useState<Record<number, string>>({});
   const [previousValues, setPreviousValues] = useState<Record<number, string>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
+  const [draft, setDraft] = useState<OfflineCycleDraft | null>(null);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,12 +43,15 @@ export function FieldReader() {
 
   const loadLocal = useCallback(async () => {
     const localReadings = await offlineDb.readings.orderBy("apartmentId").toArray();
+    const cycleId = localReadings[0]?.cycleId ?? null;
     setReadings(localReadings);
-    setValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.currentReading ?? "")])));
-    setPreviousValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.previousReading ?? "")])));
+    setCurrentCycleId(cycleId);
+    setValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.currentReading ?? "")] )));
+    setPreviousValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.previousReading ?? "")] )));
     setNotes(Object.fromEntries(localReadings.map((reading) => [reading.id!, reading.notes ?? ""])));
     setPendingSyncCount(localReadings.filter((reading) => reading.syncStatus === "pending" || reading.syncStatus === "error").length);
-  }, [setPendingSyncCount]);
+    setDraft(cycleId ? (await offlineDb.cycleDrafts.get(cycleId)) ?? null : null);
+  }, [setCurrentCycleId, setPendingSyncCount]);
 
   const refreshFieldData = useCallback(
     async (silent = false) => {
@@ -48,11 +60,12 @@ export function FieldReader() {
       if (!silent) setMessage(null);
 
       try {
-        const response = await fetch("/api/field");
+        const response = await fetch("/api/field", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) {
-          const localReadings = await offlineDb.readings.toArray();
-          const hasUnsynced = localReadings.some((reading) => reading.syncStatus === "pending" || reading.syncStatus === "error");
+          const hasUnsynced = (await offlineDb.readings.toArray()).some(
+            (reading) => reading.syncStatus === "pending" || reading.syncStatus === "error"
+          );
           if (response.status === 404 && !hasUnsynced) {
             await saveFieldPayload([]);
             await loadLocal();
@@ -62,12 +75,10 @@ export function FieldReader() {
           throw new Error(data.error ?? "تعذر تحديث قائمة الشقق");
         }
         await saveFieldPayload(data.readings);
-        if (!silent) setMessage("تم تحديث قائمة الشقق");
         await loadLocal();
+        if (!silent) setMessage("تم تحديث بيانات الدورة بدون تغيير النسخة المحفوظة على الجهاز");
       } catch (caught) {
-        if (!silent) {
-          setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
-        }
+        if (!silent) setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
       } finally {
         if (!silent) setLoading(false);
       }
@@ -76,7 +87,7 @@ export function FieldReader() {
   );
 
   useEffect(() => {
-    loadLocal();
+    void loadLocal();
     fetch("/api/network-url")
       .then((response) => response.json())
       .then((data) => setMobileUrl(data.fieldUrl ?? `${window.location.origin}/field`))
@@ -84,9 +95,7 @@ export function FieldReader() {
 
     const updateOnline = () => setIsOnline(navigator.onLine);
     updateOnline();
-    if (navigator.onLine) {
-      void refreshFieldData(true);
-    }
+    if (navigator.onLine) void refreshFieldData(true);
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
@@ -95,76 +104,93 @@ export function FieldReader() {
     };
   }, [loadLocal, refreshFieldData, setIsOnline]);
 
-  useEffect(() => {
-    if (isOnline) {
-      void refreshFieldData(true);
-    }
-  }, [isOnline, refreshFieldData]);
-
   const progress = useMemo(() => {
     const read = readings.filter((reading) => reading.isRead).length;
-    return {
-      read,
-      total: readings.length,
-      percent: readings.length ? Math.round((read / readings.length) * 100) : 0
-    };
+    return { read, total: readings.length, percent: readings.length ? Math.round((read / readings.length) * 100) : 0 };
   }, [readings]);
 
   const activeCycleId = readings[0]?.cycleId ?? null;
   const canApprove = Boolean(activeCycleId && progress.total > 0 && progress.read === progress.total);
-
   const filteredReadings = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return readings;
-    return readings.filter((reading) => {
-      return (
+    return readings.filter(
+      (reading) =>
         reading.apartmentNumber.toLowerCase().includes(term) ||
         (reading.ownerName ?? "").toLowerCase().includes(term) ||
         String(reading.floor ?? "").includes(term)
-      );
-    });
+    );
   }, [query, readings]);
 
-  async function save(reading: OfflineReading) {
-    setError(null);
-    try {
-      const previousValue = reading.canEditPrevious ? Number(previousValues[reading.id!] ?? "") : reading.previousReading;
-      const currentValue = Number(values[reading.id!] ?? "");
-
-      if (!Number.isFinite(previousValue)) throw new Error("أدخل القراءة السابقة بشكل صحيح");
-      if (!Number.isFinite(currentValue)) throw new Error("أدخل القراءة الحالية بشكل صحيح");
-
-      await markReading(reading, currentValue, notes[reading.id!] ?? null, previousValue);
-      await loadLocal();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
-    }
+  function markDirty(id: number) {
+    setDirtyIds((current) => new Set(current).add(id));
   }
 
-  async function sync() {
+  async function persistReading(reading: OfflineReading) {
+    const previousValue = Number(previousValues[reading.id!] ?? "");
+    const currentValue = Number(values[reading.id!] ?? "");
+    if (!Number.isFinite(previousValue)) throw new Error(`أدخل القراءة السابقة للشقة ${reading.apartmentNumber}`);
+    if (!Number.isFinite(currentValue)) throw new Error(`أدخل القراءة الحالية للشقة ${reading.apartmentNumber}`);
+    await markReading(reading, currentValue, notes[reading.id!] ?? null, previousValue);
+  }
+
+  async function saveCycleOnDevice(silent = false) {
+    if (!activeCycleId) throw new Error("لا توجد دورة مفتوحة للحفظ");
+    const changed = readings.filter((reading) => dirtyIds.has(reading.id!));
+    for (const reading of changed) await persistReading(reading);
+    await saveCycleDraft(activeCycleId, changed.length ? "pending" : undefined);
+    setDirtyIds(new Set());
+    await loadLocal();
+    if (!silent) setMessage(changed.length ? `تم حفظ ${changed.length} قراءة على الجهاز` : "الدورة محفوظة على الجهاز");
+  }
+
+  async function saveReading(reading: OfflineReading) {
     setLoading(true);
     setError(null);
     setMessage(null);
     try {
-      await refreshFieldData(true);
-      const result = await syncPendingReadings();
-      const finalized = result.finalizedCycles[0];
-      if (finalized) {
-        setReportUrl(`${finalized.pdfUrl}?download=1`);
-        setMessage(`تمت مزامنة ${result.synced} قراءة، والدورة معتمدة سابقا`);
-      } else if (result.pendingCycles[0]?.unreadCount) {
-        setReportUrl(null);
-        setMessage(`تمت مزامنة ${result.synced} قراءة، والمتبقي ${result.pendingCycles[0].unreadCount} شقق قبل تجهيز الفوترة`);
-      } else if (result.readyCycles[0]) {
-        setReportUrl(null);
-        setMessage(`تمت مزامنة ${result.synced} قراءة، والدورة جاهزة للاعتماد`);
+      await persistReading(reading);
+      setDirtyIds((current) => {
+        const next = new Set(current);
+        next.delete(reading.id!);
+        return next;
+      });
+      if (isOnline) {
+        try {
+          await syncPendingReadings();
+          setMessage("تم حفظ القراءة ومزامنتها");
+        } catch {
+          setMessage("تم حفظ القراءة على الجهاز، وستتم مزامنتها عند توفر اتصال ثابت");
+        }
       } else {
-        setReportUrl(null);
-        setMessage(`تمت مزامنة ${result.synced} قراءة`);
+        setMessage("تم حفظ القراءة على الجهاز");
       }
       await loadLocal();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
+      setError(caught instanceof Error ? caught.message : "تعذر حفظ القراءة");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function syncCycle() {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      if (!isOnline) throw new Error("اتصل بالإنترنت للمزامنة. النسخة المحلية محفوظة بالفعل.");
+      await saveCycleOnDevice(true);
+      const result = await syncPendingReadings();
+      if (result.pendingCycles[0]?.unreadCount) {
+        setMessage(`تمت المزامنة. المتبقي ${result.pendingCycles[0].unreadCount} شقق`);
+      } else if (result.readyCycles[0]) {
+        setMessage("تمت مزامنة كل القراءات والدورة جاهزة للاعتماد");
+      } else {
+        setMessage(result.synced ? `تمت مزامنة ${result.synced} قراءة` : "كل القراءات متزامنة");
+      }
+      await loadLocal();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذرت المزامنة");
       await loadLocal();
     } finally {
       setLoading(false);
@@ -173,54 +199,42 @@ export function FieldReader() {
 
   async function downloadPdf(cycleId: number, weekStart?: string) {
     const pdfUrl = `/api/pdf/${cycleId}?download=1`;
-    setReportUrl(pdfUrl);
     const response = await fetch(pdfUrl);
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!response.ok || !contentType.includes("application/pdf")) {
+    if (!response.ok || !(response.headers.get("content-type") ?? "").includes("application/pdf")) {
       throw new Error("تعذر تنزيل ملف PDF");
     }
-
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(await response.blob());
     const link = document.createElement("a");
     link.href = objectUrl;
     link.download = `water-cycle-${cycleId}${weekStart ? `-${weekStart}` : ""}.pdf`;
-    document.body.appendChild(link);
     link.click();
-    link.remove();
-    URL.revokeObjectURL(objectUrl);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
   async function approveCycle() {
     setLoading(true);
     setError(null);
     setMessage(null);
-
     try {
-      if (!isOnline) throw new Error("يجب الاتصال بالإنترنت لاعتماد الدورة");
-
-      const localReadings = await offlineDb.readings.orderBy("apartmentId").toArray();
-      const cycleId = localReadings[0]?.cycleId;
-      if (!cycleId) throw new Error("لا توجد دورة مفتوحة للاعتماد");
-
+      if (!isOnline) throw new Error("اعتماد الدورة يحتاج اتصالاً بالإنترنت. احفظها على الجهاز أولاً.");
+      if (!activeCycleId) throw new Error("لا توجد دورة مفتوحة للاعتماد");
+      await saveCycleOnDevice(true);
+      const localReadings = await offlineDb.readings.where("cycleId").equals(activeCycleId).toArray();
       const unreadCount = localReadings.filter((reading) => !reading.isRead).length;
       if (unreadCount > 0) throw new Error(`المتبقي ${unreadCount} شقق قبل الاعتماد`);
+      await syncPendingReadings();
 
-      const syncResult = await syncPendingReadings();
-      if (syncResult.pendingCycles[0]?.unreadCount) {
-        throw new Error(`المتبقي ${syncResult.pendingCycles[0].unreadCount} شقق قبل الاعتماد`);
-      }
-
-      const response = await fetch(`/api/cycles/${cycleId}/finalize`, { method: "PUT" });
+      const response = await fetch(`/api/cycles/${activeCycleId}/finalize`, { method: "PUT" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "تعذر اعتماد الدورة");
 
-      await saveFieldPayload([]);
+      await saveCycleDraft(activeCycleId, "synced");
       await loadLocal();
-      setMessage(`تم اعتماد الدورة رقم ${data.cycle.id} وتجهيز الفاتورة`);
+      setReportUrl(`/api/pdf/${data.cycle.id}?download=1`);
+      setMessage("تم اعتماد الدورة وحساب الفواتير. التقرير جاهز للتنزيل.");
       await downloadPdf(data.cycle.id, data.cycle.weekStart);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "حدث خطأ غير متوقع");
+      setError(caught instanceof Error ? caught.message : "تعذر اعتماد الدورة");
       await loadLocal();
     } finally {
       setLoading(false);
@@ -229,9 +243,6 @@ export function FieldReader() {
 
   async function copyMobileLink() {
     const link = mobileUrl || `${window.location.origin}/field`;
-    setError(null);
-    setMessage(null);
-
     try {
       await navigator.clipboard.writeText(link);
       setMessage("تم نسخ رابط القارئ الميداني");
@@ -241,178 +252,73 @@ export function FieldReader() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="p-3 sm:p-4">
-        <CardHeader className="mb-3">
+    <div className="space-y-4 pb-6">
+      <Card className="overflow-hidden border-accent/25 bg-surface">
+        <CardHeader className="mb-5 border-b border-border/70 pb-4">
           <div>
-            <CardTitle className="text-base sm:text-lg">القارئ الميداني</CardTitle>
-            <CardDescription className="hidden sm:block">
-              القائمة تتحدث تلقائيا عند الاتصال، وبعدها يعمل الإدخال بدون إنترنت.
-            </CardDescription>
+            <div className="mb-2 flex items-center gap-2 text-accent"><Smartphone className="h-5 w-5" /><span className="text-xs font-bold">القارئ الميداني</span></div>
+            <CardTitle className="text-xl sm:text-2xl">قراءات دورة واحدة، محفوظة دائماً</CardTitle>
+            <CardDescription>احفظ العمل على الجهاز أولاً، ثم زامنه واعتمده عند توفر اتصال.</CardDescription>
           </div>
-          <Badge variant={isOnline ? "success" : "danger"}>{isOnline ? "متصل" : "بدون شبكة"}</Badge>
+          <Badge variant={isOnline ? "success" : "warning"}>{isOnline ? <Cloud className="ml-1 h-3.5 w-3.5" /> : <CloudOff className="ml-1 h-3.5 w-3.5" />}{isOnline ? "متصل" : "دون اتصال"}</Badge>
         </CardHeader>
 
-        <div className="grid grid-cols-3 gap-2">
-          <Button type="button" className="min-h-14 flex-col px-2 text-xs sm:min-h-12 sm:flex-row sm:text-sm" onClick={() => refreshFieldData(false)} disabled={loading || !isOnline}>
-            <Download className="h-5 w-5" />
-            تحديث
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Button type="button" variant="secondary" className="min-h-14" onClick={() => refreshFieldData(false)} disabled={loading || !isOnline}>
+            <RefreshCw className="h-5 w-5" />تحديث الشقق
           </Button>
-          <Button
-            type="button"
-            className="min-h-14 flex-col px-2 text-xs sm:min-h-12 sm:flex-row sm:text-sm"
-            variant="secondary"
-            onClick={sync}
-            disabled={loading || !isOnline || pendingSyncCount === 0}
-          >
-            <RefreshCw className="h-5 w-5" />
-            مزامنة
+          <Button type="button" variant="secondary" className="min-h-14" onClick={() => void saveCycleOnDevice()} disabled={loading || !activeCycleId}>
+            <Save className="h-5 w-5" />حفظ على الجهاز
           </Button>
-          <Button type="button" className="min-h-14 flex-col px-2 text-xs sm:min-h-12 sm:flex-row sm:text-sm" onClick={approveCycle} disabled={loading || !isOnline || !canApprove}>
-            <CheckCircle className="h-5 w-5" />
-            اعتماد
+          <Button type="button" className="min-h-14" onClick={syncCycle} disabled={loading || !isOnline || !activeCycleId}>
+            <RefreshCw className="h-5 w-5" />مزامنة {pendingSyncCount ? `(${pendingSyncCount})` : ""}
+          </Button>
+          <Button type="button" className="min-h-14 bg-success text-bg hover:bg-success/85" onClick={approveCycle} disabled={loading || !isOnline || !canApprove}>
+            <ShieldCheck className="h-5 w-5" />اعتماد وإصدار الفاتورة
           </Button>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-          <div className="flex min-h-12 min-w-0 items-center gap-2 rounded-md border border-border bg-bg/70 px-3">
-            <Smartphone className="h-5 w-5 shrink-0 text-accent" />
-            <span className="number min-w-0 truncate text-xs text-text-primary sm:text-sm">{mobileUrl || "/field"}</span>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div className="flex min-h-14 items-center gap-3 rounded-md border border-border bg-bg/60 px-4">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/10 text-accent"><CheckCircle2 className="h-5 w-5" /></span>
+            <div className="min-w-0"><p className="text-xs text-text-muted">حالة الحفظ</p><p className="truncate text-sm font-semibold text-text-primary">{draftStatus(draft, pendingSyncCount)}</p></div>
           </div>
-          <Button type="button" className="min-h-12" variant="secondary" onClick={copyMobileLink}>
-            <Copy className="h-5 w-5" />
-            نسخ الرابط
-          </Button>
+          <Button type="button" variant="ghost" className="min-h-14" onClick={copyMobileLink}><Copy className="h-5 w-5" />نسخ الرابط</Button>
         </div>
 
-        <div className="mt-4">
-          <WaterProgress value={progress.percent} label={`تم قراءة ${progress.read} من ${progress.total} شقة`} />
-        </div>
-
-        {reportUrl ? (
-          <a
-            href={reportUrl}
-            download
-            className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg hover:bg-accent-dim"
-          >
-            <FileText className="h-5 w-5" />
-            فتح تقرير PDF
-          </a>
-        ) : null}
+        <div className="mt-5"><WaterProgress value={progress.percent} label={`تمت قراءة ${progress.read} من ${progress.total} شقة`} /></div>
+        {reportUrl ? <a href={reportUrl} download className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-accent bg-accent/10 px-4 text-sm font-semibold text-accent"><FileText className="h-5 w-5" />تنزيل تقرير PDF</a> : null}
         {message ? <p className="mt-4 rounded-md border border-success/40 bg-success/10 p-3 text-sm text-success">{message}</p> : null}
         {error ? <p className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</p> : null}
       </Card>
 
-      <div className="sticky top-[112px] z-30 -mx-3 border-y border-border bg-bg/90 px-3 py-2 backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-        <label className="relative block">
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="ابحث برقم الشقة أو الاسم"
-            className="min-h-12 pr-10 text-base"
-          />
-        </label>
+      <div className="sticky top-[76px] z-30 border border-border/80 bg-bg/95 p-2 shadow-lg backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+        <label className="relative block"><Search className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث برقم الشقة أو الاسم" className="min-h-12 pr-10 text-base" /></label>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {filteredReadings.map((reading) => {
-          const previous = reading.canEditPrevious ? Number(previousValues[reading.id!] ?? 0) : reading.previousReading;
-          const current = Number(values[reading.id!] ?? reading.previousReading);
+          const previous = Number(previousValues[reading.id!] ?? reading.previousReading);
+          const current = Number(values[reading.id!] ?? previous);
           const consumption = Number.isFinite(current) && Number.isFinite(previous) ? Math.max(0, current - previous) : 0;
           const status = readingStatus(reading);
-
           return (
-            <Card key={reading.id} className="flex flex-col gap-3 p-3 sm:p-4">
+            <Card key={reading.id} className="flex flex-col gap-4 border-border bg-surface p-4 shadow-none transition hover:border-accent/40">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-text-muted">شقة</span>
-                    <h2 className="number text-3xl font-bold leading-none">{reading.apartmentNumber}</h2>
-                  </div>
-                  <p className="mt-2 truncate text-base font-bold text-text-primary">{reading.ownerName ?? "-"}</p>
-                  <p className="text-xs text-text-muted">الطابق {reading.floor ?? "-"}</p>
-                </div>
+                <div><p className="text-xs font-semibold text-text-muted">شقة</p><h2 className="number mt-1 text-3xl font-bold text-text-primary">{reading.apartmentNumber}</h2><p className="mt-2 text-sm font-bold">{reading.ownerName ?? "-"}</p><p className="text-xs text-text-muted">الطابق {reading.floor ?? "-"}</p></div>
                 <Badge variant={status.variant}>{status.label}</Badge>
               </div>
-
-              <div className="grid gap-2">
-                {reading.canEditPrevious ? (
-                  <label className="block text-sm font-semibold text-text-muted">
-                    القراءة السابقة
-                    <Input
-                      inputMode="decimal"
-                      className="number mt-1 min-h-14 text-lg"
-                      value={previousValues[reading.id!] ?? ""}
-                      onChange={(event) =>
-                        setPreviousValues((currentValues) => ({ ...currentValues, [reading.id!]: event.target.value }))
-                      }
-                    />
-                  </label>
-                ) : (
-                  <div className="rounded-md border border-border bg-bg/70 p-3">
-                    <p className="text-xs font-semibold text-text-muted">القراءة السابقة</p>
-                    <p className="number mt-1 text-xl">{formatCups(reading.previousReading, 4)}</p>
-                  </div>
-                )}
-
-                <label className="block text-sm font-semibold text-text-muted">
-                  القراءة الحالية
-                  <Input
-                    inputMode="decimal"
-                    className="number mt-1 min-h-14 text-lg"
-                    value={values[reading.id!] ?? ""}
-                    onChange={(event) => setValues((currentValues) => ({ ...currentValues, [reading.id!]: event.target.value }))}
-                  />
-                </label>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="block text-sm font-semibold text-text-muted">
-                    ملاحظات
-                    <Input
-                      className="mt-1"
-                      value={notes[reading.id!] ?? ""}
-                      onChange={(event) => setNotes((currentNotes) => ({ ...currentNotes, [reading.id!]: event.target.value }))}
-                    />
-                  </label>
-                  <div className="rounded-md border border-border bg-bg/70 p-3">
-                    <p className="text-xs font-semibold text-text-muted">الاستهلاك</p>
-                    <p className="number mt-1 text-xl text-accent">{formatCups(consumption, 2)}</p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-semibold text-text-muted">القراءة السابقة<Input inputMode="decimal" className="number mt-1 min-h-12 text-base" value={previousValues[reading.id!] ?? ""} onChange={(event) => { setPreviousValues((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label>
+                <label className="text-xs font-semibold text-text-muted">القراءة الحالية<Input inputMode="decimal" className="number mt-1 min-h-12 text-base" value={values[reading.id!] ?? ""} onChange={(event) => { setValues((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label>
               </div>
-
-              <Button type="button" size="lg" className="w-full" onClick={() => save(reading)}>
-                <Save className="h-5 w-5" />
-                حفظ القراءة
-              </Button>
+              <div className="grid grid-cols-[1fr_auto] gap-2"><label className="text-xs font-semibold text-text-muted">ملاحظات<Input className="mt-1 min-h-11" value={notes[reading.id!] ?? ""} onChange={(event) => { setNotes((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label><div className="self-end rounded-md border border-border bg-bg/60 px-3 py-2"><p className="text-xs text-text-muted">الاستهلاك</p><p className="number mt-1 text-lg font-bold text-accent">{formatCups(consumption, 2)}</p></div></div>
+              <Button type="button" variant="secondary" className="w-full" onClick={() => saveReading(reading)} disabled={loading}><Save className="h-4 w-4" />حفظ القراءة</Button>
             </Card>
           );
         })}
       </div>
-
-      {!filteredReadings.length ? (
-        <Card className="p-5 text-center text-sm text-text-muted">
-          {query.trim() ? "لا توجد شقق مطابقة للبحث الحالي" : "لا توجد دورة مفتوحة للقراءة الآن"}
-        </Card>
-      ) : null}
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 px-3 py-3 backdrop-blur-xl sm:hidden">
-        <div className="mx-auto flex max-w-7xl items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-text-muted">المتبقي للمزامنة</p>
-            <p className="text-lg font-bold text-text-primary">{pendingSyncCount}</p>
-          </div>
-          <Button type="button" className="min-h-12 flex-1 px-2 text-xs" onClick={sync} disabled={loading || !isOnline || pendingSyncCount === 0}>
-            <RefreshCw className="h-5 w-5" />
-            مزامنة
-          </Button>
-          <Button type="button" className="min-h-12 flex-1 px-2 text-xs" onClick={approveCycle} disabled={loading || !isOnline || !canApprove}>
-            <CheckCircle className="h-5 w-5" />
-            اعتماد
-          </Button>
-        </div>
-      </div>
+      {!filteredReadings.length ? <Card className="p-6 text-center text-sm text-text-muted">{query.trim() ? "لا توجد شقق مطابقة للبحث" : "لا توجد دورة مفتوحة للقراءة الآن"}</Card> : null}
     </div>
   );
 }
