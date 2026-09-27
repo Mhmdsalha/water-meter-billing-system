@@ -9,21 +9,20 @@ import { formatCups } from "@/lib/format";
 import { offlineDb, type OfflineCycleDraft, type OfflineReading } from "@/lib/offline/dexie";
 import { markReading, saveCycleDraft, saveFieldPayload, syncPendingReadings } from "@/lib/offline/sync";
 import { useAppStore } from "@/store/useAppStore";
-import { CheckCircle2, Cloud, CloudOff, Copy, Download, FileText, RefreshCw, Save, Search, ShieldCheck, Smartphone } from "lucide-react";
+import { CheckCircle2, Cloud, CloudOff, Copy, FileText, RefreshCw, Save, Search, ShieldCheck, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 function readingStatus(reading: OfflineReading) {
-  if (reading.syncStatus === "error") return { label: "يحتاج مزامنة", variant: "danger" as const };
+  if (reading.syncStatus === "error") return { label: "محفوظ على الجهاز", variant: "warning" as const };
   if (reading.syncStatus === "pending") return { label: "محفوظ محلياً", variant: "warning" as const };
-  if (reading.isRead) return { label: "متزامن", variant: "success" as const };
+  if (reading.isRead) return { label: "محفوظ", variant: "success" as const };
   return { label: "بانتظار القراءة", variant: "muted" as const };
 }
 
 function draftStatus(draft: OfflineCycleDraft | null, pending: number) {
   if (!draft) return "لم تحفظ أي قراءة محلياً بعد";
-  if (draft.status === "error") return "النسخة المحلية محفوظة وتنتظر إعادة المزامنة";
-  if (pending > 0) return `محفوظ على الجهاز - ${pending} بانتظار المزامنة`;
-  return "محفوظ ومتزامن";
+  if (pending > 0 || draft.status === "error") return `${pending} قراءة محفوظة على الجهاز وجاهزة للرفع عند الاعتماد`;
+  return "القراءات المحفوظة مرفوعة تلقائياً";
 }
 
 export function FieldReader() {
@@ -134,16 +133,6 @@ export function FieldReader() {
     await markReading(reading, currentValue, notes[reading.id!] ?? null, previousValue);
   }
 
-  async function saveCycleOnDevice(silent = false) {
-    if (!activeCycleId) throw new Error("لا توجد دورة مفتوحة للحفظ");
-    const changed = readings.filter((reading) => dirtyIds.has(reading.id!));
-    for (const reading of changed) await persistReading(reading);
-    await saveCycleDraft(activeCycleId, changed.length ? "pending" : undefined);
-    setDirtyIds(new Set());
-    await loadLocal();
-    if (!silent) setMessage(changed.length ? `تم حفظ ${changed.length} قراءة على الجهاز` : "الدورة محفوظة على الجهاز");
-  }
-
   async function saveReading(reading: OfflineReading) {
     setLoading(true);
     setError(null);
@@ -173,30 +162,6 @@ export function FieldReader() {
     }
   }
 
-  async function syncCycle() {
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    try {
-      if (!isOnline) throw new Error("اتصل بالإنترنت للمزامنة. النسخة المحلية محفوظة بالفعل.");
-      await saveCycleOnDevice(true);
-      const result = await syncPendingReadings();
-      if (result.pendingCycles[0]?.unreadCount) {
-        setMessage(`تمت المزامنة. المتبقي ${result.pendingCycles[0].unreadCount} شقق`);
-      } else if (result.readyCycles[0]) {
-        setMessage("تمت مزامنة كل القراءات والدورة جاهزة للاعتماد");
-      } else {
-        setMessage(result.synced ? `تمت مزامنة ${result.synced} قراءة` : "كل القراءات متزامنة");
-      }
-      await loadLocal();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "تعذرت المزامنة");
-      await loadLocal();
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function downloadPdf(cycleId: number, weekStart?: string) {
     const pdfUrl = `/api/pdf/${cycleId}?download=1`;
     const response = await fetch(pdfUrl);
@@ -218,7 +183,7 @@ export function FieldReader() {
     try {
       if (!isOnline) throw new Error("اعتماد الدورة يحتاج اتصالاً بالإنترنت. احفظها على الجهاز أولاً.");
       if (!activeCycleId) throw new Error("لا توجد دورة مفتوحة للاعتماد");
-      await saveCycleOnDevice(true);
+      if (dirtyIds.size > 0) throw new Error("احفظ القراءات التي عدلتها قبل الاعتماد");
       const localReadings = await offlineDb.readings.where("cycleId").equals(activeCycleId).toArray();
       const unreadCount = localReadings.filter((reading) => !reading.isRead).length;
       if (unreadCount > 0) throw new Error(`المتبقي ${unreadCount} شقق قبل الاعتماد`);
@@ -258,20 +223,14 @@ export function FieldReader() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-accent"><Smartphone className="h-5 w-5" /><span className="text-xs font-bold">القارئ الميداني</span></div>
             <CardTitle className="text-xl sm:text-2xl">قراءات دورة واحدة، محفوظة دائماً</CardTitle>
-            <CardDescription>احفظ العمل على الجهاز أولاً، ثم زامنه واعتمده عند توفر اتصال.</CardDescription>
+            <CardDescription>احفظ قراءة كل شقة. عند الاعتماد، تُرفع كل القراءات المحفوظة تلقائياً وتُصدر الفاتورة.</CardDescription>
           </div>
           <Badge variant={isOnline ? "success" : "warning"}>{isOnline ? <Cloud className="ml-1 h-3.5 w-3.5" /> : <CloudOff className="ml-1 h-3.5 w-3.5" />}{isOnline ? "متصل" : "دون اتصال"}</Badge>
         </CardHeader>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2">
           <Button type="button" variant="secondary" className="min-h-14" onClick={() => refreshFieldData(false)} disabled={loading || !isOnline}>
             <RefreshCw className="h-5 w-5" />تحديث الشقق
-          </Button>
-          <Button type="button" variant="secondary" className="min-h-14" onClick={() => void saveCycleOnDevice()} disabled={loading || !activeCycleId}>
-            <Save className="h-5 w-5" />حفظ على الجهاز
-          </Button>
-          <Button type="button" className="min-h-14" onClick={syncCycle} disabled={loading || !isOnline || !activeCycleId}>
-            <RefreshCw className="h-5 w-5" />مزامنة {pendingSyncCount ? `(${pendingSyncCount})` : ""}
           </Button>
           <Button type="button" className="min-h-14 bg-success text-bg hover:bg-success/85" onClick={approveCycle} disabled={loading || !isOnline || !canApprove}>
             <ShieldCheck className="h-5 w-5" />اعتماد وإصدار الفاتورة
