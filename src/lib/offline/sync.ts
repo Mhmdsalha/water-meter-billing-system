@@ -45,7 +45,7 @@ export async function saveFieldPayload(readings: OfflineReading[]) {
       await offlineDb.readings.update(existing.id!, {
         ...reading,
         id: existing.id,
-        previousReading: preserveLocalInput ? existing.previousReading : reading.previousReading,
+        previousReading: reading.previousReading,
         currentReading: preserveLocalInput ? existing.currentReading : reading.currentReading,
         notes: preserveLocalInput ? existing.notes : reading.notes,
         isRead: preserveLocalInput ? existing.isRead : reading.isRead,
@@ -59,9 +59,9 @@ export async function saveFieldPayload(readings: OfflineReading[]) {
 export async function markReading(
   reading: OfflineReading,
   currentReading: number,
-  notes: string | null,
-  previousReading = reading.previousReading
+  notes: string | null
 ) {
+  const previousReading = reading.previousReading;
   if (currentReading < previousReading) {
     throw new Error("القراءة الحالية لا يمكن أن تكون أقل من السابقة");
   }
@@ -90,7 +90,6 @@ export async function syncPendingReadings() {
       readings: pending.map((reading) => ({
         cycleId: reading.cycleId,
         apartmentId: reading.apartmentId,
-        previousReading: reading.previousReading,
         currentReading: reading.currentReading,
         notes: reading.notes
       }))

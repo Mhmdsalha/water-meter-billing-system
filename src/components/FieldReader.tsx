@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
 import { WaterProgress } from "@/components/WaterProgress";
 import { formatCups } from "@/lib/format";
 import { offlineDb, type OfflineCycleDraft, type OfflineReading } from "@/lib/offline/dexie";
@@ -29,7 +30,6 @@ export function FieldReader() {
   const { isOnline, setCurrentCycleId, setIsOnline, pendingSyncCount, setPendingSyncCount } = useAppStore();
   const [readings, setReadings] = useState<OfflineReading[]>([]);
   const [values, setValues] = useState<Record<number, string>>({});
-  const [previousValues, setPreviousValues] = useState<Record<number, string>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
   const [draft, setDraft] = useState<OfflineCycleDraft | null>(null);
@@ -39,6 +39,8 @@ export function FieldReader() {
   const [loading, setLoading] = useState(false);
   const [mobileUrl, setMobileUrl] = useState<string>("");
   const [reportUrl, setReportUrl] = useState<string | null>(null);
+  const [readingToConfirm, setReadingToConfirm] = useState<OfflineReading | null>(null);
+  const [confirmApproval, setConfirmApproval] = useState(false);
 
   const loadLocal = useCallback(async () => {
     const localReadings = await offlineDb.readings.orderBy("apartmentId").toArray();
@@ -46,7 +48,6 @@ export function FieldReader() {
     setReadings(localReadings);
     setCurrentCycleId(cycleId);
     setValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.currentReading ?? "")] )));
-    setPreviousValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.previousReading ?? "")] )));
     setNotes(Object.fromEntries(localReadings.map((reading) => [reading.id!, reading.notes ?? ""])));
     setPendingSyncCount(localReadings.filter((reading) => reading.syncStatus === "pending" || reading.syncStatus === "error").length);
     setDraft(cycleId ? (await offlineDb.cycleDrafts.get(cycleId)) ?? null : null);
@@ -92,9 +93,11 @@ export function FieldReader() {
       .then((data) => setMobileUrl(data.fieldUrl ?? `${window.location.origin}/field`))
       .catch(() => setMobileUrl(`${window.location.origin}/field`));
 
-    const updateOnline = () => setIsOnline(navigator.onLine);
+    const updateOnline = () => {
+      setIsOnline(navigator.onLine);
+      if (navigator.onLine) void refreshFieldData(true);
+    };
     updateOnline();
-    if (navigator.onLine) void refreshFieldData(true);
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
@@ -126,11 +129,9 @@ export function FieldReader() {
   }
 
   async function persistReading(reading: OfflineReading) {
-    const previousValue = Number(previousValues[reading.id!] ?? "");
     const currentValue = Number(values[reading.id!] ?? "");
-    if (!Number.isFinite(previousValue)) throw new Error(`أدخل القراءة السابقة للشقة ${reading.apartmentNumber}`);
     if (!Number.isFinite(currentValue)) throw new Error(`أدخل القراءة الحالية للشقة ${reading.apartmentNumber}`);
-    await markReading(reading, currentValue, notes[reading.id!] ?? null, previousValue);
+    await markReading(reading, currentValue, notes[reading.id!] ?? null);
   }
 
   async function saveReading(reading: OfflineReading) {
@@ -232,7 +233,7 @@ export function FieldReader() {
           <Button type="button" variant="secondary" className="min-h-14" onClick={() => refreshFieldData(false)} disabled={loading || !isOnline}>
             <RefreshCw className="h-5 w-5" />تحديث الشقق
           </Button>
-          <Button type="button" className="min-h-14 bg-success text-bg hover:bg-success/85" onClick={approveCycle} disabled={loading || !isOnline || !canApprove}>
+          <Button type="button" className="min-h-14 bg-success text-bg hover:bg-success/85" onClick={() => setConfirmApproval(true)} disabled={loading || !isOnline || !canApprove}>
             <ShieldCheck className="h-5 w-5" />اعتماد وإصدار الفاتورة
           </Button>
         </div>
@@ -257,7 +258,7 @@ export function FieldReader() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {filteredReadings.map((reading) => {
-          const previous = Number(previousValues[reading.id!] ?? reading.previousReading);
+          const previous = Number(reading.previousReading);
           const current = Number(values[reading.id!] ?? previous);
           const consumption = Number.isFinite(current) && Number.isFinite(previous) ? Math.max(0, current - previous) : 0;
           const status = readingStatus(reading);
@@ -268,16 +269,34 @@ export function FieldReader() {
                 <Badge variant={status.variant}>{status.label}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-semibold text-text-muted">القراءة السابقة<Input inputMode="decimal" className="number mt-1 min-h-12 text-base" value={previousValues[reading.id!] ?? ""} onChange={(event) => { setPreviousValues((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label>
+                <label className="text-xs font-semibold text-text-muted">القراءة السابقة<Input readOnly aria-readonly="true" inputMode="decimal" className="number mt-1 min-h-12 text-base opacity-80" value={formatCups(reading.previousReading, 4)} /></label>
                 <label className="text-xs font-semibold text-text-muted">القراءة الحالية<Input inputMode="decimal" className="number mt-1 min-h-12 text-base" value={values[reading.id!] ?? ""} onChange={(event) => { setValues((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label>
               </div>
               <div className="grid grid-cols-[1fr_auto] gap-2"><label className="text-xs font-semibold text-text-muted">ملاحظات<Input className="mt-1 min-h-11" value={notes[reading.id!] ?? ""} onChange={(event) => { setNotes((items) => ({ ...items, [reading.id!]: event.target.value })); markDirty(reading.id!); }} /></label><div className="self-end rounded-md border border-border bg-bg/60 px-3 py-2"><p className="text-xs text-text-muted">الاستهلاك</p><p className="number mt-1 text-lg font-bold text-accent">{formatCups(consumption, 2)}</p></div></div>
-              <Button type="button" variant="secondary" className="w-full" onClick={() => saveReading(reading)} disabled={loading}><Save className="h-4 w-4" />حفظ القراءة</Button>
+              <Button type="button" variant="secondary" className="w-full" onClick={() => setReadingToConfirm(reading)} disabled={loading}><Save className="h-4 w-4" />حفظ القراءة</Button>
             </Card>
           );
         })}
       </div>
       {!filteredReadings.length ? <Card className="p-6 text-center text-sm text-text-muted">{query.trim() ? "لا توجد شقق مطابقة للبحث" : "لا توجد دورة مفتوحة للقراءة الآن"}</Card> : null}
+      <Dialog open={Boolean(readingToConfirm)} title="تأكيد حفظ القراءة" onClose={() => !loading && setReadingToConfirm(null)}>
+        {readingToConfirm ? <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">حفظ القراءة الحالية للشقة {readingToConfirm.apartmentNumber} بقيمة <span className="number font-bold text-text-primary">{values[readingToConfirm.id!] ?? "-"}</span>؟</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={loading} onClick={async () => { const selected = readingToConfirm; setReadingToConfirm(null); await saveReading(selected); }}>{loading ? "جارٍ الحفظ" : "تأكيد الحفظ"}</Button>
+            <Button type="button" variant="secondary" disabled={loading} onClick={() => setReadingToConfirm(null)}>رجوع</Button>
+          </div>
+        </div> : null}
+      </Dialog>
+      <Dialog open={confirmApproval} title="تأكيد اعتماد الدورة" onClose={() => !loading && setConfirmApproval(false)}>
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">سيتم اعتماد القراءات المحفوظة وحساب الفواتير للدورة الحالية.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={loading} onClick={async () => { setConfirmApproval(false); await approveCycle(); }}>{loading ? "جارٍ الاعتماد" : "تأكيد الاعتماد"}</Button>
+            <Button type="button" variant="secondary" disabled={loading} onClick={() => setConfirmApproval(false)}>رجوع</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

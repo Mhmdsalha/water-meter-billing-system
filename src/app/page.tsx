@@ -61,7 +61,7 @@ export default async function DashboardPage() {
             </>
           ) : <p className="mt-8 text-sm text-text-muted">أنشئ دورة جديدة للبدء.</p>}
           <div className="mt-6 grid gap-2 sm:grid-cols-2">
-            <ActionLink href={hasOpenCycle && cycle ? `/cycles/${cycle.id}/readings` : "/cycles/new"} label={hasOpenCycle ? "إدخال القراءات" : "إنشاء دورة"} icon={hasOpenCycle ? ClipboardList : CalendarPlus} variant="primary" />
+            <ActionLink href={hasOpenCycle ? "/field" : "/cycles/new"} label={hasOpenCycle ? "فتح القارئ الميداني" : "إنشاء دورة"} icon={hasOpenCycle ? ClipboardList : CalendarPlus} variant="primary" />
             <ActionLink href={cycle ? `/cycles/${cycle.id}/report` : "#"} label="تنزيل التقرير" icon={FileText} disabled={!cycle || hasOpenCycle} />
           </div>
         </Card>

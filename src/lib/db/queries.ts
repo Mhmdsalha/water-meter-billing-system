@@ -684,7 +684,6 @@ export async function bulkUpsertReadings(
     if (!existing) throw new Error("قراءة الشقة غير موجودة في الدورة الحالية");
 
     const detail = await updateReading(existing.id, {
-      previousReading: reading.previousReading,
       currentReading: reading.currentReading,
       notes: reading.notes
     });

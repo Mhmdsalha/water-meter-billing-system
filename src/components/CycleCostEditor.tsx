@@ -19,9 +19,14 @@ export function CycleCostEditor({ cycle }: { cycle: CycleRow }) {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   async function save(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    setConfirmSave(true);
+  }
+
+  async function persist() {
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -40,6 +45,7 @@ export function CycleCostEditor({ cycle }: { cycle: CycleRow }) {
     }
 
     setMessage(`تم تحديث بيانات الدورة وإعادة الفوترة. المستحق الآن ₪ ${formatMoney(data.cycle?.totalBilled)}`);
+    setConfirmSave(false);
     setOpen(false);
     router.refresh();
   }
@@ -100,6 +106,16 @@ export function CycleCostEditor({ cycle }: { cycle: CycleRow }) {
             {loading ? "جاري الحفظ..." : "حفظ وإعادة الفوترة"}
           </Button>
         </form>
+      </Dialog>
+      <Dialog open={confirmSave} title="تأكيد تعديل الدورة" onClose={() => !loading && setConfirmSave(false)}>
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">سيتم حفظ بيانات الدورة وإعادة حساب الفواتير حسب التكلفة الجديدة.</p>
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" onClick={() => void persist()} disabled={loading}>{loading ? "جارٍ الحفظ" : "تأكيد وإعادة الفوترة"}</Button>
+            <Button type="button" variant="secondary" onClick={() => setConfirmSave(false)} disabled={loading}>رجوع</Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );

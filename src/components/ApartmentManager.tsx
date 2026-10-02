@@ -3,6 +3,7 @@
 import type { ApartmentRow } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
@@ -18,12 +19,18 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [pendingForm, setPendingForm] = useState<FormData | null>(null);
+  const [pendingToggle, setPendingToggle] = useState<ApartmentRow | null>(null);
 
   function sortApartments(items: ApartmentRow[]) {
     return [...items].sort((a, b) => Number(a.number) - Number(b.number) || a.number.localeCompare(b.number, "ar"));
   }
 
-  async function save(formData: FormData) {
+  function save(formData: FormData) {
+    setPendingForm(formData);
+  }
+
+  async function persist(formData: FormData) {
     setLoading(true);
     setError(null);
     const isEditing = Boolean(editingApartment);
@@ -51,6 +58,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
       )
     );
     setEditingApartment(null);
+    setPendingForm(null);
     router.refresh();
   }
 
@@ -72,6 +80,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
       if (editingApartment?.id === apartment.id) {
         setEditingApartment(data.apartment);
       }
+      setPendingToggle(null);
       router.refresh();
     } catch {
       setError("تعذر تحديث حالة الشقة. حاول مرة أخرى.");
@@ -188,7 +197,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
                   <Edit3 className="h-4 w-4" />
                   تعديل
                 </Button>
-                <Button type="button" size="sm" variant="secondary" className="min-h-11" onClick={() => toggle(apartment)} disabled={togglingId === apartment.id}>
+                <Button type="button" size="sm" variant="secondary" className="min-h-11" onClick={() => setPendingToggle(apartment)} disabled={togglingId === apartment.id}>
                   <Power className="h-4 w-4" />
                   {apartment.isActive ? "تعطيل" : "تفعيل"}
                 </Button>
@@ -238,7 +247,7 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
                         <Edit3 className="h-4 w-4" />
                         تعديل
                       </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => toggle(apartment)} disabled={togglingId === apartment.id}>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => setPendingToggle(apartment)} disabled={togglingId === apartment.id}>
                         <Power className="h-4 w-4" />
                         {apartment.isActive ? "تعطيل" : "تفعيل"}
                       </Button>
@@ -257,6 +266,26 @@ export function ApartmentManager({ initialApartments }: { initialApartments: Apa
           </Table>
         </TableWrap>
       </Card>
+      <Dialog open={Boolean(pendingForm)} title={editingApartment ? "تأكيد تعديل بيانات الشقة" : "تأكيد إضافة الشقة"} onClose={() => !loading && setPendingForm(null)}>
+        {pendingForm ? <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">{editingApartment ? "حفظ التعديلات على الشقة" : "إضافة الشقة"} <span className="number font-bold text-text-primary">{String(pendingForm.get("number") ?? "")}</span>؟</p>
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={loading} onClick={() => void persist(pendingForm)}>{loading ? "جارٍ الحفظ" : "تأكيد وحفظ"}</Button>
+            <Button type="button" variant="secondary" disabled={loading} onClick={() => setPendingForm(null)}>رجوع</Button>
+          </div>
+        </div> : null}
+      </Dialog>
+      <Dialog open={Boolean(pendingToggle)} title={pendingToggle?.isActive ? "تأكيد تعطيل الشقة" : "تأكيد تفعيل الشقة"} onClose={() => !togglingId && setPendingToggle(null)}>
+        {pendingToggle ? <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">{pendingToggle.isActive ? "تعطيل" : "إعادة تفعيل"} الشقة <span className="number font-bold text-text-primary">{pendingToggle.number}</span>؟</p>
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={togglingId === pendingToggle.id} onClick={() => void toggle(pendingToggle)}>{togglingId === pendingToggle.id ? "جارٍ التحديث" : "تأكيد"}</Button>
+            <Button type="button" variant="secondary" disabled={togglingId === pendingToggle.id} onClick={() => setPendingToggle(null)}>رجوع</Button>
+          </div>
+        </div> : null}
+      </Dialog>
     </div>
   );
 }

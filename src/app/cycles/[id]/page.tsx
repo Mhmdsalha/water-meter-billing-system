@@ -55,7 +55,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
 
       <div className="grid gap-3 md:grid-cols-3">
         {[
-          [`/cycles/${detail.cycle.id}/readings`, "إدخال القراءات", ClipboardList],
+          ...(detail.cycle.status === "open" ? [["/field", "فتح القارئ الميداني", ClipboardList] as const] : []),
           [`/cycles/${detail.cycle.id}/billing`, "مراجعة الفوترة", ReceiptText],
           [`/cycles/${detail.cycle.id}/report`, "تقرير PDF", FileText]
         ].map(([href, label, Icon]) => (

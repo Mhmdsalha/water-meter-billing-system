@@ -77,6 +77,23 @@ select {
   background: rgba(12, 15, 20, 0.12);
 }
 
+.navigation-progress {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 10000;
+  height: 3px;
+  width: 35%;
+  background: rgb(var(--accent));
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.65);
+  animation: navigation-progress 1.1s ease-in-out infinite;
+}
+
+@keyframes navigation-progress {
+  0% { transform: translateX(0) scaleX(0.25); transform-origin: left; }
+  50% { transform: translateX(120%) scaleX(1); transform-origin: left; }
+  100% { transform: translateX(320%) scaleX(0.35); transform-origin: left; }
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }

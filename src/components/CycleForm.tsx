@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -16,8 +17,13 @@ export function CycleForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [clientRequestId, setClientRequestId] = useState(createRequestId);
+  const [pendingForm, setPendingForm] = useState<FormData | null>(null);
 
-  async function submit(formData: FormData) {
+  function submit(formData: FormData) {
+    setPendingForm(formData);
+  }
+
+  async function createCycle(formData: FormData) {
     setLoading(true);
     setError(null);
     try {
@@ -36,8 +42,9 @@ export function CycleForm() {
         setError(data.error ?? "تعذر إنشاء الدورة");
         return;
       }
+      setPendingForm(null);
       setClientRequestId(createRequestId());
-      router.push(`/cycles/${data.cycle.id}/readings`);
+      router.push("/field");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر إنشاء الدورة، أعد المحاولة وسيتم استخدام نفس طلب الحفظ");
@@ -73,6 +80,16 @@ export function CycleForm() {
           إنشاء الدورة
         </Button>
       </form>
+      <Dialog open={Boolean(pendingForm)} title="تأكيد إنشاء الدورة" onClose={() => !loading && setPendingForm(null)}>
+        {pendingForm ? <div className="space-y-4">
+          <p className="text-sm leading-6 text-text-muted">إنشاء دورة بتاريخ <span className="number font-bold text-text-primary">{String(pendingForm.get("readingDate") ?? "")}</span> وتكلفة <span className="number font-bold text-text-primary">₪ {String(pendingForm.get("generatorCost") ?? "")}</span>؟</p>
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={loading} onClick={() => void createCycle(pendingForm)}>{loading ? "جارٍ الإنشاء" : "تأكيد الإنشاء"}</Button>
+            <Button type="button" variant="secondary" disabled={loading} onClick={() => setPendingForm(null)}>رجوع</Button>
+          </div>
+        </div> : null}
+      </Dialog>
     </Card>
   );
 }
