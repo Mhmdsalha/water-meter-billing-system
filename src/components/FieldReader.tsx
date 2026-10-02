@@ -43,8 +43,16 @@ export function FieldReader() {
   const [confirmApproval, setConfirmApproval] = useState(false);
 
   const loadLocal = useCallback(async () => {
-    const localReadings = await offlineDb.readings.orderBy("apartmentId").toArray();
-    const cycleId = localReadings[0]?.cycleId ?? null;
+    const allLocalReadings = await offlineDb.readings.toArray();
+    const cycleId = allLocalReadings.reduce<number | null>(
+      (latest, reading) => latest === null || reading.cycleId > latest ? reading.cycleId : latest,
+      null
+    );
+    const localReadings = cycleId === null
+      ? []
+      : allLocalReadings
+          .filter((reading) => reading.cycleId === cycleId)
+          .sort((a, b) => a.apartmentId - b.apartmentId);
     setReadings(localReadings);
     setCurrentCycleId(cycleId);
     setValues(Object.fromEntries(localReadings.map((reading) => [reading.id!, String(reading.currentReading ?? "")] )));

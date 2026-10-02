@@ -546,13 +546,43 @@ async function getPreviousSnapshotsBefore(weekStart: string, id: number) {
   );
 }
 
-export async function recalculateCyclesAfter(weekStart: string, id = 0) {
+export async function recalculateCyclesAfter(weekStart: string, id = 0, meterAdjustmentIds: number[] = []) {
   const cycles = await getCycleSummariesAfter(weekStart, id);
   let snapshots = await getPreviousSnapshotsBefore(weekStart, id);
+  const pendingRows = meterAdjustmentIds.length > 0
+    ? await allRows(
+        `SELECT id, apartment_id as apartmentId, baseline_reading as baselineReading
+         FROM meter_adjustments
+         WHERE id IN (${meterAdjustmentIds.map(() => "?").join(",")})
+         ORDER BY id ASC`,
+        meterAdjustmentIds
+      )
+    : [];
+  const pendingByApartment = new Map<number, { baselineReading: number; ids: number[] }>();
+  for (const row of pendingRows) {
+    const apartmentId = Number(row.apartmentId);
+    const pending = pendingByApartment.get(apartmentId) ?? { baselineReading: Number(row.baselineReading), ids: [] };
+    pending.baselineReading = Number(row.baselineReading);
+    pending.ids.push(Number(row.id));
+    pendingByApartment.set(apartmentId, pending);
+  }
 
   for (const cycle of cycles) {
     const detail = await getCycleDetail(cycle.id);
     if (!detail) continue;
+
+    const appliedAdjustmentIds: number[] = [];
+    for (const reading of detail.readings) {
+      const pending = pendingByApartment.get(reading.apartmentId);
+      if (!pending) continue;
+      const priorSnapshot = snapshots.get(reading.apartmentId);
+      snapshots.set(reading.apartmentId, {
+        currentReading: pending.baselineReading,
+        fractionCarried: priorSnapshot?.fractionCarried ?? reading.fractionFromPrev
+      });
+      appliedAdjustmentIds.push(...pending.ids);
+      pendingByApartment.delete(reading.apartmentId);
+    }
 
     for (const reading of detail.readings) {
       const snapshot = snapshots.get(reading.apartmentId);
@@ -568,6 +598,14 @@ export async function recalculateCyclesAfter(weekStart: string, id = 0) {
          SET previous_reading = ?, current_reading = ?, cups_consumed = ?, fraction_from_prev = ?
          WHERE id = ?`,
         [previousReading, currentReading, cupsConsumed, snapshot.fractionCarried, reading.id]
+      );
+    }
+
+    if (appliedAdjustmentIds.length > 0) {
+      await runSql(
+        `UPDATE meter_adjustments SET applied_cycle_id = ?, is_applied = 1
+         WHERE id IN (${appliedAdjustmentIds.map(() => "?").join(",")})`,
+        [cycle.id, ...appliedAdjustmentIds]
       );
     }
 
@@ -608,12 +646,20 @@ export async function recalculateCyclesAfter(weekStart: string, id = 0) {
 
 export async function deleteCycle(id: number) {
   const cycle = await getCycle(id);
-  if (!cycle) throw new Error("الدورة غير موجودة");
+  if (!cycle) return { deleted: true, id, alreadyDeleted: true };
+  const affectedAdjustments = await allRows<{ id: number }>(
+    "SELECT id FROM meter_adjustments WHERE applied_cycle_id = ?",
+    [id]
+  );
+
+  // Rebase later cycles before deleting so a billing validation error cannot leave a
+  // deleted cycle behind while its stale row remains visible in the client.
+  await recalculateCyclesAfter(cycle.weekStart, id, affectedAdjustments.map((adjustment) => Number(adjustment.id)));
 
   await batchSql(
     [
-      // Keep the meter-change audit entry, but release its foreign-key link before deleting the cycle.
-      { sql: "UPDATE meter_adjustments SET applied_cycle_id = NULL WHERE applied_cycle_id = ?", args: [id] },
+      // Keep the meter-change audit entry pending so it becomes the next cycle's baseline.
+      { sql: "UPDATE meter_adjustments SET applied_cycle_id = NULL, is_applied = 0 WHERE applied_cycle_id = ?", args: [id] },
       { sql: "DELETE FROM payments WHERE cycle_id = ?", args: [id] },
       { sql: "DELETE FROM meter_readings WHERE cycle_id = ?", args: [id] },
       { sql: "DELETE FROM billing_cycles WHERE id = ?", args: [id] }
@@ -621,7 +667,6 @@ export async function deleteCycle(id: number) {
     "write"
   );
 
-  await recalculateCyclesAfter(cycle.weekStart, id);
   return { deleted: true, id };
 }
 
