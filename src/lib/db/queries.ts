@@ -321,6 +321,55 @@ export async function getLatestOpenCycle() {
   return row ? normalizeCycle(row) : null;
 }
 
+async function applyUnlinkedMeterAdjustments(cycleId: number) {
+  const rows = await allRows(
+    `SELECT ma.id as adjustmentId, ma.apartment_id as apartmentId,
+      ma.baseline_reading as baselineReading, mr.id as readingId, mr.is_read as isRead
+     FROM meter_adjustments ma
+     JOIN meter_readings mr ON mr.apartment_id = ma.apartment_id AND mr.cycle_id = ?
+     WHERE ma.applied_cycle_id IS NULL
+     ORDER BY ma.id ASC`,
+    [cycleId]
+  );
+  const byApartment = new Map<number, { readingId: number; baselineReading: number; adjustmentIds: number[] }>();
+
+  for (const row of rows) {
+    if (Number(row.isRead)) continue;
+    const apartmentId = Number(row.apartmentId);
+    const adjustment = byApartment.get(apartmentId) ?? {
+      readingId: Number(row.readingId),
+      baselineReading: Number(row.baselineReading),
+      adjustmentIds: []
+    };
+    adjustment.baselineReading = Number(row.baselineReading);
+    adjustment.adjustmentIds.push(Number(row.adjustmentId));
+    byApartment.set(apartmentId, adjustment);
+  }
+
+  const adjustments = [...byApartment.values()];
+  if (adjustments.length === 0) return;
+
+  const adjustmentIds = adjustments.flatMap((item) => item.adjustmentIds);
+  await batchSql(
+    [
+      ...adjustments.map((item) => ({
+        sql: `UPDATE meter_readings
+          SET previous_reading = ?, current_reading = ?, cups_consumed = 0,
+              consumption_cost = NULL, raw_amount = NULL, billed_amount = NULL,
+              fraction_carried = NULL, read_at = NULL
+          WHERE id = ? AND is_read = 0`,
+        args: [item.baselineReading, item.baselineReading, item.readingId]
+      })),
+      {
+        sql: `UPDATE meter_adjustments SET applied_cycle_id = ?, is_applied = 1
+          WHERE id IN (${adjustmentIds.map(() => "?").join(",")})`,
+        args: [cycleId, ...adjustmentIds]
+      }
+    ],
+    "write"
+  );
+}
+
 export async function createCycle(input: {
   weekStart: string;
   weekEnd: string;
@@ -343,7 +392,10 @@ export async function createCycle(input: {
     "SELECT id FROM billing_cycles WHERE week_start = ? AND status = 'open' ORDER BY id DESC LIMIT 1",
     [readingDate]
   );
-  if (existingOpenCycle) return getCycleDetail(Number(existingOpenCycle.id));
+  if (existingOpenCycle) {
+    await applyUnlinkedMeterAdjustments(Number(existingOpenCycle.id));
+    return getCycleDetail(Number(existingOpenCycle.id));
+  }
 
   const cycleResult = await runSql("INSERT INTO billing_cycles (week_start, week_end, generator_cost, notes, client_request_id) VALUES (?, ?, ?, ?, ?)", [
     readingDate,
@@ -369,7 +421,7 @@ export async function createCycle(input: {
   const pendingAdjustments = await allRows(
     `SELECT id, apartment_id as apartmentId, baseline_reading as baselineReading
      FROM meter_adjustments
-     WHERE COALESCE(is_applied, 0) = 0
+     WHERE applied_cycle_id IS NULL
        AND apartment_id IN (${apartments.map(() => "?").join(",") || "NULL"})
      ORDER BY id ASC`,
     apartments.map((apartment) => apartment.id)
